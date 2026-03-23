@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Monitor de Paciente — RealTime</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Bootstrap (solo estilos) -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- uPlot (gráficos ultra-rápidos) -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/uplot/dist/uPlot.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/uplot/dist/uPlot.iife.min.js"></script>
+
+    <style>
+      /* -------------------------
+         Estilos generales (sin cambios visuales importantes)
+         ------------------------- */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #012;
+        color: white;
+        font-family: "Segoe UI", sans-serif;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .monitor-container {
+        display: flex;
+        height: 100vh;
+        flex-direction: column;
+      }
+
+      .header-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 20px;
+        background: #000;
+        color: white;
+      }
+
+      .zona-superior {
+        flex: 1 1 auto;
+        display: flex;
+        min-height: 0;
+      }
+
+      .charts {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .chart-container {
+        flex: 1 1 0;
+        min-height: 0;
+        width: 100%;
+        background: #011;
+        border-bottom: 1px solid #333;
+        position: relative;
+      }
+
+      /* Cuadrícula tenue tipo monitor (no interfiere con la señal) */
+      .monitor-grid {
+        background-size: 20px 20px;
+        background-image: linear-gradient(
+            to right,
+            rgba(0, 255, 0, 0.06) 1px,
+            transparent 1px
+          ),
+          linear-gradient(to bottom, rgba(0, 255, 0, 0.06) 1px, transparent 1px);
+      }
+
+      .panel-lateral {
+        width: 160px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        align-items: flex-end;
+        padding: 10px;
+        background: #000;
+        font-size: 2.5rem;
+      }
+
+      .value {
+        text-align: right;
+        cursor: pointer;
+      }
+      .sensor-label {
+        font-size: 0.9rem;
+        color: #aaa;
+        margin-bottom: -5px;
+        text-align: right;
+      }
+      .ecg {
+        color: #0f0;
+      }
+      .spo2 {
+        color: #0ef;
+      }
+      .pulso {
+        color: #f00;
+      }
+      .resp {
+        color: #fff;
+      }
+
+      .pni-panel {
+        flex: 0 0 25vh;
+        display: flex;
+        align-items: flex-start;
+        background: #111;
+        padding: 10px;
+        border-top: 2px solid #333;
+        width: 100%;
+        overflow: hidden;
+        gap: 20px;
+      }
+      .pni-item {
+        font-size: 1.5rem;
+        font-weight: bold;
+        min-width: 180px;
+        cursor: pointer;
+      }
+      .pni-item .label {
+        font-size: 0.9rem;
+        color: #aaa;
+        display: block;
+      }
+      .pni-tabla {
+        flex: 1;
+        overflow-y: auto;
+      }
+      .pni-tabla table {
+        width: 100%;
+        font-size: 0.9rem;
+        color: #fff;
+      }
+      .pni-tabla th,
+      .pni-tabla td {
+        padding: 4px;
+        border-bottom: 1px solid #333;
+      }
+
+      /* -------------------------
+         Alarm / Asystole visuals
+         ------------------------- */
+      .alarm {
+        box-shadow: 0 0 24px 8px rgba(255, 0, 0, 0.12),
+          inset 0 0 10px 2px rgba(255, 0, 0, 0.05);
+        animation: pulse-border 1s infinite;
+      }
+      @keyframes pulse-border {
+        0% {
+          border-color: rgba(255, 0, 0, 0);
+        }
+        50% {
+          border-color: rgba(255, 0, 0, 0.35);
+        }
+        100% {
+          border-color: rgba(255, 0, 0, 0);
+        }
+      }
+      #monitorTitle.status-fail {
+        color: #ff6b6b;
+      }
+      #monitorTitle.status-ok {
+        color: #8aff8a;
+      }
+
+      /* uPlot canvas/tamaño: asegurar que ocupe contenedor */
+      .chart-container > .uplot {
+        position: absolute !important;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="monitor-container">
+      <div class="header-bar">
+        <button id="backButton" class="btn btn-secondary btn-sm">
+          ← Volver
+        </button>
+        <h3 id="monitorTitle" class="status-ok">Monitor de Paciente</h3>
+      </div>
+
+      <div class="zona-superior">
+        <div class="charts">
+          <div id="ecgChart" class="chart-container monitor-grid"></div>
+          <div id="spo2Chart" class="chart-container monitor-grid"></div>
+          <div id="respChart" class="chart-container monitor-grid"></div>
+        </div>
+
+        <div class="panel-lateral">
+          <div class="value pulso" id="pulsoVal">
+            <div class="sensor-label">Pulso</div>
+            --- bpm
+          </div>
+          <div class="value spo2" id="spo2Val">
+            <div class="sensor-label">SpO₂</div>
+            --- %
+          </div>
+          <div class="value resp" id="respVal">
+            <div class="sensor-label">Temp. Piel</div>
+            --- °C
+          </div>
+        </div>
+      </div>
+
+      <div class="pni-panel">
+        <div class="pni-item" id="tempAmbVal">
+          <span class="label">Temp. Ambiente</span> --- °C
+        </div>
+        <div class="pni-item" id="luzAmbVal">
+          <span class="label">Luz Ambiente</span> --- lx
+        </div>
+
+        <div class="pni-tabla">
+          <table class="table table-dark table-sm">
+            <thead>
+              <tr>
+                <th>Fecha/Hora</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody id="tablaPni"></tbody>
+          </table>
+        </div>
+
+        <div class="pni-item" id="pniActual">
+          <span class="label">PNI</span> ---/---
+        </div>
+      </div>
+    </div>
+
+    <!-- audio de alarma (podés poner un archivo real reemplazando src) -->
+    <audio id="alarmTone" preload="auto" src=""></audio>
+
+    <script>
+      /****************************************************************
+       * Config y estado
+       ****************************************************************/
+      const FS_DEFAULT = 500; // fallback sample rate
+      const DISPLAY_SECONDS = 10; // segundos visibles (p. ej. 10s = monitor tradicional)
+      const NO_DATA_TIMEOUT_MS = 2200; // tiempo sin paquetes para declarar ASISTOLIA
+      const QRS_REFRACTORY_MS = 250; // refractario entre detecciones
+      let QRS_THRESHOLD = 0.6; // umbral simple, ajustable según señal
+
+      // Buffers y objetos
+      let ecgPlaybackBuffer = []; // muestras float de ECG (en unidades ya normalizadas)
+      let ppgPlaybackBuffer = []; // muestras PPG (SPO2_IR u otro)
+      let fs_current = FS_DEFAULT;
+      let lastEcgPacketTime = Date.now();
+
+      // uPlot objects
+      let ecgPlotObj = null;
+      let spo2PlotObj = null;
+      let respPlotObj = null;
+
+      // HR calc
+      let qrsTimestamps = [];
+      let lastBeatTs = 0;
+
+      // UI state
+      let ultimasPni = [];
+      let lastSpo2 = null,
+        lastPulso = null,
+        lastPniSys = null,
+        lastPniDia = null,
+        lastTemp = null,
+        lastTempAmb = null,
+        lastLuzAmb = null;
+
+      /****************************************************************
+       * Utiles UI
+       ****************************************************************/
+      function actualizarTablaPni() {
+        document.getElementById("tablaPni").innerHTML = ultimasPni
+          .map((r) => `<tr><td>${r.fecha}</td><td>${r.valor}</td></tr>`)
+          .join("");
+      }
+
+      function actualizarValoresUI() {
+        document.getElementById("pulsoVal").innerHTML =
+          `<div class='sensor-label'>Pulso</div>` +
+          (lastPulso ? `${lastPulso} bpm` : "--- bpm");
+        document.getElementById("spo2Val").innerHTML =
+          `<div class='sensor-label'>SpO₂</div>` +
+          (lastSpo2 ? `${lastSpo2} %` : "--- %");
+        document.getElementById("respVal").innerHTML =
+          `<div class='sensor-label'>Temp. Piel</div>` +
+          (lastTemp ? `${lastTemp.toFixed(1)} °C` : "--- °C");
+        document.getElementById("pniActual").innerHTML =
+          `<span class='label'>PNI</span>` +
+          (lastPniSys && lastPniDia
+            ? `${lastPniSys}/${lastPniDia}`
+            : "---/---");
+        document.getElementById("tempAmbVal").innerHTML =
+          `<span class='label'>Temp. Ambiente</span>` +
+          (lastTempAmb ? `${lastTempAmb.toFixed(1)} °C` : "--- °C");
+        document.getElementById("luzAmbVal").innerHTML =
+          `<span class='label'>Luz Ambiente</span>` +
+          (lastLuzAmb ? `${lastLuzAmb.toFixed(0)} lx` : "--- lx");
+      }
+
+      /****************************************************************
+       * Crear plots (uPlot)
+       * - data arrays se reemplazan/ajustan según fs_current y DISPLAY_SECONDS
+       ****************************************************************/
+      function makeEmptyData(windowSamples) {
+        return [
+          Array.from({ length: windowSamples }, (_, i) => i),
+          Array(windowSamples).fill(null),
+        ];
+      }
+
+      function crearPlot(targetEl, color, windowSamples) {
+        const data = makeEmptyData(windowSamples);
+        const opts = {
+          width: targetEl.clientWidth,
+          height: targetEl.clientHeight,
+          scales: { x: { time: false }, y: { auto: true } },
+          series: [{}, { stroke: color, width: 1.2 }],
+          axes: [{ show: false }, { show: false }],
+          cursor: { points: { show: false } },
+          plugins: [],
+        };
+        const plot = new uPlot(opts, data, targetEl);
+        return { plot, data };
+      }
+
+      /****************************************************************
+       * Auto-escalado inteligente (ventana corta, evita picos extremos)
+       ****************************************************************/
+      function autoScale(plotObj) {
+        try {
+          const arr = plotObj.data[1];
+          const win = arr
+            .slice(-Math.min(arr.length, Math.floor(fs_current * 3)))
+            .filter((v) => v !== null && !isNaN(v));
+          if (win.length < 20) return;
+          let min = Math.min(...win),
+            max = Math.max(...win);
+          const amp = max - min;
+          if (amp < 0.02 || amp > 8) return;
+          const margin = amp * 0.25;
+          min -= margin;
+          max += margin;
+          plotObj.plot.setScale("y", { min, max });
+        } catch (e) {
+          /* fail silently */
+        }
+      }
+
+      /****************************************************************
+       * QRS detection (simple threshold + refractory)
+       ****************************************************************/
+      function processForQRS(blockSamples) {
+        const nowMs = Date.now();
+        for (let i = 0; i < blockSamples.length; i++) {
+          const s = blockSamples[i];
+          if (s == null) continue;
+          if (s > QRS_THRESHOLD) {
+            if (nowMs - lastBeatTs > QRS_REFRACTORY_MS) {
+              lastBeatTs = nowMs;
+              qrsTimestamps.push(nowMs);
+              if (qrsTimestamps.length > 12) qrsTimestamps.shift();
+            }
+          }
+        }
+      }
+
+      function computeHR() {
+        if (qrsTimestamps.length < 2) return null;
+        const diffs = [];
+        for (let i = 1; i < qrsTimestamps.length; i++)
+          diffs.push((qrsTimestamps[i] - qrsTimestamps[i - 1]) / 1000.0);
+        const avg = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+        return Math.round(60 / avg);
+      }
+
+      /****************************************************************
+       * Asystole handling (visual + sound + flatline injection)
+       ****************************************************************/
+      let asystoleActive = false;
+      function goAsystole() {
+        if (asystoleActive) return;
+        asystoleActive = true;
+        document.getElementById("ecgChart").classList.add("alarm");
+        document.getElementById("monitorTitle").classList.remove("status-ok");
+        document.getElementById("monitorTitle").classList.add("status-fail");
+        const a = document.getElementById("alarmTone");
+        if (a && a.src) {
+          try {
+            a.currentTime = 0;
+            a.play().catch(() => {});
+          } catch (e) {}
+        }
+        // rellenar buffer para mostrar flatline inmediatamente
+        for (let i = 0; i < fs_current * 2; i++) ecgPlaybackBuffer.push(0.0);
+      }
+      function stopAsystole() {
+        if (!asystoleActive) return;
+        asystoleActive = false;
+        document.getElementById("ecgChart").classList.remove("alarm");
+        document.getElementById("monitorTitle").classList.remove("status-fail");
+        document.getElementById("monitorTitle").classList.add("status-ok");
+        const a = document.getElementById("alarmTone");
+        try {
+          if (a) {
+            a.pause();
+            a.currentTime = 0;
+          }
+        } catch (e) {}
+      }
+
+      /****************************************************************
+       * Realtime playback loop (requestAnimationFrame)
+       ****************************************************************/
+      function initRealtime(fs) {
+        fs_current = fs || FS_DEFAULT;
+        const windowSamples = Math.max(
+          1000,
+          Math.floor(fs_current * DISPLAY_SECONDS)
+        );
+
+        // crear o ajustar plots
+        if (!ecgPlotObj)
+          ecgPlotObj = crearPlot(
+            document.getElementById("ecgChart"),
+            "#0f0",
+            windowSamples
+          );
+        else {
+          ecgPlotObj.data = makeEmptyData(windowSamples);
+          ecgPlotObj.plot.setData(ecgPlotObj.data);
+        }
+
+        if (!spo2PlotObj)
+          spo2PlotObj = crearPlot(
+            document.getElementById("spo2Chart"),
+            "#0ef",
+            windowSamples
+          );
+        else {
+          spo2PlotObj.data = makeEmptyData(windowSamples);
+          spo2PlotObj.plot.setData(spo2PlotObj.data);
+        }
+
+        if (!respPlotObj)
+          respPlotObj = crearPlot(
+            document.getElementById("respChart"),
+            "#fff",
+            windowSamples
+          );
+        else {
+          respPlotObj.data = makeEmptyData(windowSamples);
+          respPlotObj.plot.setData(respPlotObj.data);
+        }
+
+        // single ticker
+        if (!window._monitorTickerStarted) {
+          window._monitorTickerStarted = true;
+          let lastTick = performance.now();
+          let carry = 0;
+          function tick(now) {
+            const dt = now - lastTick;
+            lastTick = now;
+            const samplesFloat = (fs_current * dt) / 1000 + carry;
+            const samplesToConsume = Math.floor(samplesFloat);
+            carry = samplesFloat - samplesToConsume;
+
+            if (samplesToConsume > 0) {
+              // ECG
+              const taken = [];
+              for (let i = 0; i < samplesToConsume; i++) {
+                if (ecgPlaybackBuffer.length > 0)
+                  taken.push(ecgPlaybackBuffer.shift());
+                else taken.push(0.0); // injec flatline if no data
+              }
+              // push to ecg plot
+              for (let i = 0; i < taken.length; i++) {
+                ecgPlotObj.data[1].shift();
+                ecgPlotObj.data[1].push(taken[i]);
+              }
+              processForQRS(taken);
+              ecgPlotObj.plot.setData(ecgPlotObj.data);
+
+              // PPG: consumir menos (ej: 1 muestra cada 5)
+              for (let i = 0; i < Math.min(samplesToConsume, 20); i++) {
+                if (ppgPlaybackBuffer.length > 0) {
+                  spo2PlotObj.data[1].shift();
+                  spo2PlotObj.data[1].push(ppgPlaybackBuffer.shift());
+                } else {
+                  spo2PlotObj.data[1].shift();
+                  spo2PlotObj.data[1].push(null);
+                }
+              }
+              spo2PlotObj.plot.setData(spo2PlotObj.data);
+            }
+
+            // auto-scale ECG suavemente
+            try {
+              autoScale(ecgPlotObj);
+            } catch (e) {}
+
+            // HR UI update ~250 ms
+            if (!window._hrUpdatedAt || now - window._hrUpdatedAt > 250) {
+              window._hrUpdatedAt = now;
+              const hr = computeHR();
+              const pulsoEl = document.getElementById("pulsoVal");
+              if (hr) {
+                lastPulso = hr;
+                pulsoEl.innerHTML = `<div class='sensor-label'>Pulso</div>${hr} bpm`;
+              } else
+                pulsoEl.innerHTML = `<div class='sensor-label'>Pulso</div>--- bpm`;
+            }
+
+            // detectar timeout
+            if (Date.now() - lastEcgPacketTime > NO_DATA_TIMEOUT_MS)
+              goAsystole();
+            else stopAsystole();
+
+            requestAnimationFrame(tick);
+          }
+          requestAnimationFrame(tick);
+        }
+      }
+
+      /****************************************************************
+       * WebSocket: espera JSON con campo "sensor" y "payload" (o payload directo)
+       * - para ECG: payload.raw_values (array) y payload.FS (opcional)
+       * - para SPO2: payload.SPO2_IR (array) o payload.value
+       ****************************************************************/
+      const WS_URL = "ws://localhost:8000/ws/datos";
+      const ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        console.log("WS conectado:", WS_URL);
+        initRealtime(FS_DEFAULT);
+      };
+      ws.onerror = (e) => console.error("WS error", e);
+      ws.onclose = () => console.warn("WS cerrado");
+
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          const sensor = msg.sensor;
+          const payload = msg.payload || msg;
+
+          // ECG
+          if (sensor === "ecg" || payload.raw_values) {
+            const fs = parseInt(
+              payload.FS || payload.fs || fs_current || FS_DEFAULT
+            );
+            if (fs !== fs_current) initRealtime(fs);
+            lastEcgPacketTime = Date.now();
+            if (Array.isArray(payload.raw_values)) {
+              // convert to Number
+              const arr = payload.raw_values.map(Number);
+              ecgPlaybackBuffer.push(...arr);
+            }
+          }
+
+          // SPO2 / PPG
+          if (sensor === "spo2" || payload.SPO2_IR || payload.SPO2_R) {
+            if (Array.isArray(payload.SPO2_IR)) {
+              ppgPlaybackBuffer.push(...payload.SPO2_IR.map(Number));
+            } else if (payload.value !== undefined) {
+              // inject repeated normalized small values for plot (value 0-100 -> 0-1)
+              const v = Number(payload.value) / 100.0;
+              for (let i = 0; i < Math.floor(fs_current / 5); i++)
+                ppgPlaybackBuffer.push(v);
+            }
+            lastSpo2 = Number(payload.value || lastSpo2);
+            lastPulso = parseInt(payload.pulso || lastPulso);
+            actualizarValoresUI();
+          }
+
+          // PNI
+          if (sensor === "pni" || payload.systolic) {
+            lastPniSys = parseInt(payload.systolic);
+            lastPniDia = parseInt(payload.diastolic);
+            const fecha = new Date().toLocaleTimeString();
+            ultimasPni.unshift({ fecha, valor: `${lastPniSys}/${lastPniDia}` });
+            if (ultimasPni.length > 5) ultimasPni.pop();
+            actualizarTablaPni();
+            actualizarValoresUI();
+          }
+
+          // Temperaturas y luz
+          if (
+            sensor === "temperatura_piel" ||
+            payload.temperature ||
+            (payload.value &&
+              payload.topic &&
+              payload.topic.includes("temperatura_piel"))
+          ) {
+            lastTemp = parseFloat(payload.value || lastTemp);
+            actualizarValoresUI();
+          }
+          if (sensor === "temperatura_ambiente") {
+            lastTempAmb = parseFloat(payload.value);
+            actualizarValoresUI();
+          }
+          if (sensor === "luz_ambiente") {
+            lastLuzAmb = parseFloat(payload.value);
+            actualizarValoresUI();
+          }
+
+          // Si plots no inicializados, iniciarlos con FS del payload (si viene)
+          if (!ecgPlotObj && (payload.FS || payload.fs))
+            initRealtime(parseInt(payload.FS || payload.fs));
+        } catch (err) {
+          console.error("Error parseando WS message", err);
+        }
+      };
+
+      /****************************************************************
+       * Botón volver
+       ****************************************************************/
+      document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("backButton").onclick = () =>
+          (location.href = "index.html");
+        // initRealtime(FS_DEFAULT); // opcional: ya se llama al abrir WS
+      });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

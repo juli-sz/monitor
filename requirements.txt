@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+paho-mqtt
+numpy
+scipy
+matplotlib
+websockets
+python-multipart

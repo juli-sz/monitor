@@ -117,7 +117,7 @@ signos-vitales/
 
 ---
 
-pasemos al front se debe tener habilitado la conexiòn websocket en la pc
+pasemos al frontend se debe tener habilitado la conexiòn websocket en la pc
 flujo 
 1 corren la api con uvicorn mainf:app --reload
 2 conectan un esp32 ( corren el script de muestra con el nombre de paciente1 0 paciente 2)

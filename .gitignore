@@ -2,4 +2,4 @@ mi_entorno/
 venv/
 __pycache__/
 *.pyc
-.env
+.envgit rm -r --cached mi_entorno

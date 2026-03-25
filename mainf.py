@@ -479,7 +479,7 @@ def get_paciente_por_uid(uid: str, db: Session = Depends(get_db)):
     }
 
 # ======================================================
-# ENDPOINTS HISTÓRICOS PARA FRONTEND
+# ENDPOINTS HISTÓRICOS PARA FRONTEND   de aca para abajo falta el front para probar solo lo hice para ir probando en forma aislada
 # ======================================================
 
 from fastapi import Query

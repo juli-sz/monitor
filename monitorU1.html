@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
@@ -20,7 +20,7 @@
 
     <style>
       /* -------------------------
-         Estilos generales (sin cambios visuales importantes)
+         Estilos generales 
          ------------------------- */
       html,
       body {
@@ -70,14 +70,11 @@
         position: relative;
       }
 
-      /* Cuadrícula tenue tipo monitor (no interfiere con la señal) */
+      /* Cuadrícula tipo monitor (no interfiere con la señal) */
       .monitor-grid {
         background-size: 20px 20px;
-        background-image: linear-gradient(
-            to right,
-            rgba(0, 255, 0, 0.06) 1px,
-            transparent 1px
-          ),
+        background-image:
+          linear-gradient(to right, rgba(0, 255, 0, 0.06) 1px, transparent 1px),
           linear-gradient(to bottom, rgba(0, 255, 0, 0.06) 1px, transparent 1px);
       }
 
@@ -153,10 +150,11 @@
       }
 
       /* -------------------------
-         Alarm / Asystole visuals
+         Alarmas
          ------------------------- */
       .alarm {
-        box-shadow: 0 0 24px 8px rgba(255, 0, 0, 0.12),
+        box-shadow:
+          0 0 24px 8px rgba(255, 0, 0, 0.12),
           inset 0 0 10px 2px rgba(255, 0, 0, 0.05);
         animation: pulse-border 1s infinite;
       }
@@ -178,7 +176,7 @@
         color: #8aff8a;
       }
 
-      /* uPlot canvas/tamaño: asegurar que ocupe contenedor */
+      /* uPlot estamos aprendiddo para q ocupe todo el contenedor*/
       .chart-container > .uplot {
         position: absolute !important;
         left: 0;
@@ -247,7 +245,7 @@
       </div>
     </div>
 
-    <!-- audio de alarma (podés poner un archivo real reemplazando src) -->
+    <!-- audio de alarma vamos a ver si no es tan complicado integrar audio de alarmas -->
     <audio id="alarmTone" preload="auto" src=""></audio>
 
     <script>
@@ -319,7 +317,7 @@
 
       /****************************************************************
        * Crear plots (uPlot)
-       * - data arrays se reemplazan/ajustan según fs_current y DISPLAY_SECONDS
+       
        ****************************************************************/
       function makeEmptyData(windowSamples) {
         return [
@@ -344,7 +342,8 @@
       }
 
       /****************************************************************
-       * Auto-escalado inteligente (ventana corta, evita picos extremos)
+       * Auto-escalado inteligente esto se hice para q la imagen de la señal del ecg se adapte
+       * en la pantalla, debido q probando la bd mit-bih alguno no entraban en el contenedor por los picos q tenian algunas señales
        ****************************************************************/
       function autoScale(plotObj) {
         try {
@@ -367,7 +366,7 @@
       }
 
       /****************************************************************
-       * QRS detection (simple threshold + refractory)
+       * QRS detection esto lo tiene q hacer el back pero esbamos probando como lo hace js
        ****************************************************************/
       function processForQRS(blockSamples) {
         const nowMs = Date.now();
@@ -429,13 +428,13 @@
       }
 
       /****************************************************************
-       * Realtime playback loop (requestAnimationFrame)
+       
        ****************************************************************/
       function initRealtime(fs) {
         fs_current = fs || FS_DEFAULT;
         const windowSamples = Math.max(
           1000,
-          Math.floor(fs_current * DISPLAY_SECONDS)
+          Math.floor(fs_current * DISPLAY_SECONDS),
         );
 
         // crear o ajustar plots
@@ -443,7 +442,7 @@
           ecgPlotObj = crearPlot(
             document.getElementById("ecgChart"),
             "#0f0",
-            windowSamples
+            windowSamples,
           );
         else {
           ecgPlotObj.data = makeEmptyData(windowSamples);
@@ -454,7 +453,7 @@
           spo2PlotObj = crearPlot(
             document.getElementById("spo2Chart"),
             "#0ef",
-            windowSamples
+            windowSamples,
           );
         else {
           spo2PlotObj.data = makeEmptyData(windowSamples);
@@ -465,7 +464,7 @@
           respPlotObj = crearPlot(
             document.getElementById("respChart"),
             "#fff",
-            windowSamples
+            windowSamples,
           );
         else {
           respPlotObj.data = makeEmptyData(windowSamples);
@@ -490,9 +489,9 @@
               for (let i = 0; i < samplesToConsume; i++) {
                 if (ecgPlaybackBuffer.length > 0)
                   taken.push(ecgPlaybackBuffer.shift());
-                else taken.push(0.0); // injec flatline if no data
+                else taken.push(0.0);
               }
-              // push to ecg plot
+
               for (let i = 0; i < taken.length; i++) {
                 ecgPlotObj.data[1].shift();
                 ecgPlotObj.data[1].push(taken[i]);
@@ -500,7 +499,7 @@
               processForQRS(taken);
               ecgPlotObj.plot.setData(ecgPlotObj.data);
 
-              // PPG: consumir menos (ej: 1 muestra cada 5)
+              // PPG: consumir menos (ej: 1 muestra cada 5)tenemos q ver aca porque en la grafica dle spo2 debe ir mas lento q la del ecg
               for (let i = 0; i < Math.min(samplesToConsume, 20); i++) {
                 if (ppgPlaybackBuffer.length > 0) {
                   spo2PlotObj.data[1].shift();
@@ -518,7 +517,7 @@
               autoScale(ecgPlotObj);
             } catch (e) {}
 
-            // HR UI update ~250 ms
+            // HR UI update ~250 ms vamos a ver esto porque esta fallando
             if (!window._hrUpdatedAt || now - window._hrUpdatedAt > 250) {
               window._hrUpdatedAt = now;
               const hr = computeHR();
@@ -565,12 +564,12 @@
           // ECG
           if (sensor === "ecg" || payload.raw_values) {
             const fs = parseInt(
-              payload.FS || payload.fs || fs_current || FS_DEFAULT
+              payload.FS || payload.fs || fs_current || FS_DEFAULT,
             );
             if (fs !== fs_current) initRealtime(fs);
             lastEcgPacketTime = Date.now();
             if (Array.isArray(payload.raw_values)) {
-              // convert to Number
+              // convertir a Number
               const arr = payload.raw_values.map(Number);
               ecgPlaybackBuffer.push(...arr);
             }

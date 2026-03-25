@@ -110,7 +110,8 @@
         if (equipoToPaciente[uid_equipo] !== undefined)
           return equipoToPaciente[uid_equipo];
         try {
-          // Asume que la API de FastAPI está corriendo en localhost:8000
+          // FastAPI está corriendo en localhost:8000 tengan cuidado si cambian de puerto de fastapi
+          //o el puerto esta ocupado con otro servicio corriendo
           const resp = await fetch(
             `http://localhost:8000/pacientes_por_dispositivo_uid/${uid_equipo}`,
           );
@@ -163,7 +164,7 @@
         const consultarBtn = col.querySelector(`button[data-uid="${uid}"]`);
         if (consultarBtn) {
           consultarBtn.addEventListener("click", () => {
-            // Mantiene el vínculo a la página monitor.html
+            // Mantiene el vínculo a la página monitor.html ( o a la q no slleva el boton consultar de cada tarjeta xq voy probando diferentes versiones y librerias en esta caso no uso chartjs , uso otra q se llama uplot xq es mas fluido, pensado para cuando tengamos miles de dispositivos)
             window.location.href = `monitorU1.html?uid=${uid}`;
           });
         }
@@ -227,13 +228,13 @@
             // Se puede recibir como 'temp' o 'temperatura_piel'
             actualizarCampo(uid, "temperatura", `${payload.value ?? "--"} °C`);
           } else if (sensor === "pulso" && payload.value !== undefined) {
-            // Si el pulso viene como sensor individual
+            // Si el pulso viene como sensor individual aca con carlos estabamos viendo si lo envia el al pulso o usando alguna libreria obtener el puslso hasta el momento calcula mal el pulso al dia de la fecha año 2026
             actualizarCampo(uid, "pulso", `${payload.value} bpm`);
           }
 
           actualizarCampo(uid, "last-update", `Actualizado: ${timestamp}`);
 
-          // 3. Consultar y manejar alertas (se mantiene la lógica de alertas REST)
+          // 3. Consultar y manejar alertas
           try {
             const resPaciente = await fetch(
               `http://localhost:8000/pacientes_por_dispositivo_uid/${uid}`,
@@ -241,15 +242,15 @@
             if (!resPaciente.ok) return;
             const paciente = await resPaciente.json();
 
-            // Intentar resolver automáticamente las alertas si se cumplen los rangos (lógica de tu API)
-            // NOTA: Asumo que tienes un endpoint POST /alertas/resolver_si_corresponde/{id_paciente}
+            // Intentar resolver automáticamente las alertas si se cumplen los rangos tengo q ver esto en la api como hacerlo.
+
             await fetch(
               `http://localhost:8000/alertas/resolver_si_corresponde/${paciente.id_paciente}`,
               { method: "POST" },
             );
 
             // Consultar alertas activas
-            // NOTA: Asumo que tienes un endpoint GET /alertas/{id_paciente}?estado=ACTIVA
+            // todo el tema de alertas se esta investigando como todo jaajaja
             const res = await fetch(
               `http://localhost:8000/alertas/${paciente.id_paciente}?estado=ACTIVA`,
             );

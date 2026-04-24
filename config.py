@@ -1,13 +1,24 @@
 import os
+from dotenv import load_dotenv
 
-# Base de Datos
-# Usamos os.getenv para no dejar contraseñas a la vista. 
-# Si no encuentra la variable, usa la cadena por defecto (ideal para desarrollo local).
-DB_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:admin@localhost:5432/tu_basededatos")
+# Carga las variables desde el archivo .env a la memoria del sistema
+load_dotenv()
 
-# MQTT Broker
-MQTT_BROKER = os.getenv("MQTT_BROKER", "127.0.0.1")
+# ======================================================
+# BASE DE DATOS
+# ======================================================
+# Solo busca la variable. Si no la encuentra, devuelve None y fallará al conectar.
+DB_URL = os.getenv("DATABASE_URL")
+
+# ======================================================
+# MQTT BROKER
+# ======================================================
+# El host y las credenciales son estrictamente secretas/dinámicas
+MQTT_BROKER = os.getenv("MQTT_BROKER")
+MQTT_USERNAME = os.getenv("MQTT_USERNAME")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
+
+# Para puertos o configuraciones genéricas, sí es válido dejar un fallback 
+# porque no comprometen la seguridad si alguien lee este archivo.
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
-MQTT_USERNAME = os.getenv("MQTT_USERNAME", "juli")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "juliBAR")
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "datos/sensores/#")

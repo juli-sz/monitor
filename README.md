@@ -139,7 +139,7 @@ http://127.0.0.1:8000/docs
 (se debe tener habilitado la conexiòn websocket en la pc) (haber instalado mosquito y configurarlo)
 1. corren la api con uvicorn mainf:app --reload
 2. conectan un esp32 ( corren el script de muestra con el nombre de paciente1 0 paciente 2)
-3. con click derecho en el archivo index y abrir con live server (si no lo tienen se debe instalar en visual estudio la extension live server o entrar a la direccion http://127.0.0.1:5500/index.html)
+3. con click derecho en el archivo index y abrir con live server (si no lo tienen se debe instalar en visual estudio la extension live server o entrar a la direccion http://127.0.0.1:5500/monitor/index.html)
 esto abre una ventana en el navegador mostrando las tarjetas de los dispositivos conectados
 
 

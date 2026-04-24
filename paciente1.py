@@ -6,11 +6,11 @@ import math
 from datetime import datetime
 
 # --- Configuración del broker MQTT ---
-BROKER = "161.35.100.210"
-PORT = 1884
+BROKER = "127.0.0.1"
+PORT = 1883
 TOPICO_BASE = "datos/sensores"
-USUARIO = "salva"
-CONTRASENA = "Urbepalacio8"
+USUARIO = "juli"
+CONTRASENA = "juliBAR"
 
 # --- Callbacks MQTT ---
 def on_connect(client, userdata, flags, rc):

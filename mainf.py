@@ -29,12 +29,12 @@ from scipy.signal import butter, lfilter, iirnotch
 # ======================================================
 # CONFIGURACIÓN
 # ======================================================
-DB_URL = "postgresql+psycopg2://postgres:12345678@localhost:5432/tu_basededatos"
+DB_URL = "postgresql+psycopg2://postgres:admin@localhost:5432/tu_basededatos"
 
-MQTT_BROKER = os.getenv("MQTT_BROKER", "161.35.100.210")
-MQTT_PORT = int(os.getenv("MQTT_PORT", 1884))
-MQTT_USERNAME = os.getenv("MQTT_USERNAME", "salva")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "Urbepalacio8")
+MQTT_BROKER = os.getenv("MQTT_BROKER", "127.0.0.1")
+MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "juli")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "juliBAR")
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "datos/sensores/#")
 
 Base = declarative_base()

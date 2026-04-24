@@ -1,0 +1,113 @@
+/* =========================================
+   VARIABLES Y AJUSTES GENERALES
+   ========================================= */
+body {
+  background-color: #f8f9fa;
+  padding-top: 2rem;
+  transition: margin-left 0.3s ease-in-out;
+  margin-left: 220px;
+}
+
+/* =========================================
+   BARRA LATERAL (SIDEBAR)
+   ========================================= */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 220px;
+  background-color: #212529; /* Un tono más oscuro y moderno */
+  padding-top: 4rem;
+  color: white;
+  transition: transform 0.3s ease-in-out;
+  z-index: 1000;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.sidebar.hidden {
+  transform: translateX(-100%);
+}
+
+.sidebar h5 {
+  text-align: center;
+  color: #f8f9fa;
+  margin-bottom: 1.5rem;
+  font-weight: bold;
+}
+
+.sidebar a {
+  display: block;
+  padding: 12px 20px;
+  color: #adb5bd;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.sidebar a:hover {
+  background-color: #343a40;
+  color: #fff;
+  border-left: 4px solid #0dcaf0;
+}
+
+#menu-toggle {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1100;
+  background-color: #212529;
+  color: white;
+  border: none;
+  font-size: 1.5rem;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+#menu-toggle:hover {
+  background-color: #343a40;
+}
+
+/* =========================================
+   TARJETAS DE SENSORES
+   ========================================= */
+.sensor-card {
+  min-width: 280px;
+  margin-bottom: 1.5rem;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease-in-out;
+  background-color: #fff;
+}
+
+.sensor-card:hover {
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.sensor-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.label {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* --- Animación de Alerta Activa --- */
+@keyframes pulsoAlerta {
+  0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+.sensor-card.alerta-activa {
+  border: 2px solid #dc3545 !important;
+  animation: pulsoAlerta 2s infinite;
+}

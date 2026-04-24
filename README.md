@@ -22,15 +22,15 @@ API desarrollada con FastAPI para la gestión y monitoreo en tiempo real de sign
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/salvadorcarlos/signos-vitales.git](https://github.com/salvadorcarlos/monitor.git
-cd signos-vitales
+git clone https://github.com/juli-sz/monitor
+cd monitor
 ```
 
 ---
 
 ### 2. Crear entorno virtual
 
-```bash o en la misma termina del vsc
+```bash o en la misma terminal del vsc
 python -m venv venv
 ```
 
@@ -50,7 +50,7 @@ source venv/bin/activate
 
 ---
 
-### 3. Instalar dependencias
+### 3. Instalar dependencias (dentro del venv)
 
 ```bash
 pip install -r requirements.txt
@@ -64,8 +64,8 @@ pip install -r requirements.txt
 
 Crear base de datos:
 
-```sql
-CREATE DATABASE tu_basededatos ( aca le ponen el nombre q quieran peor recomiendo q se mantenga el nombre "tus_basedadatos" xq es el q usa el codigo;
+```sql desde postgres (pgAdmin4 x ej)
+CREATE DATABASE tu_basededatos 
 ```
 
 ---
@@ -76,7 +76,8 @@ CREATE DATABASE tu_basededatos ( aca le ponen el nombre q quieran peor recomiend
 
 ## ▶️ Ejecución
 
-```bash
+
+```bash (desde el venv)
 uvicorn mainf:app --reload
 ```
 
@@ -108,17 +109,34 @@ http://127.0.0.1:8000/docs
 ## 📁 Estructura del proyecto
 
 ```
-signos-vitales/
-│── mainf.py
-│── requirements.txt
-│── .gitignore
-│── README.md
+📂 monitor
+ ┣ 📂routes
+ ┃ ┣ 📜historico.py
+ ┃ ┣ 📜pacientes.py
+ ┃ ┗ 📜websockets.py
+ ┣ 📂services
+ ┃ ┣ 📜mqtt_service.py
+ ┃ ┣ 📜signal_processor.py
+ ┃ ┗ 📜websocket_manager.py 
+ ┣ 📜.gitignore
+ ┣ 📜app.js
+ ┣ 📜config.py
+ ┣ 📜database.py
+ ┣ 📜index.html
+ ┣ 📜mainf.py
+ ┣ 📜models.py
+ ┣ 📜monitorU1.html
+ ┣ 📜paciente1.py
+ ┣ 📜paciente2.py
+ ┣ 📜README.md
+ ┣ 📜requirements.txt
+ ┗ 📜styles.css
 ```
 
 ---
 
 pasemos al frontend se debe tener habilitado la conexiòn websocket en la pc
-flujo 
+flujo (instalar mosquito y configurarlo)
 1 corren la api con uvicorn mainf:app --reload
 2 conectan un esp32 ( corren el script de muestra con el nombre de paciente1 0 paciente 2)
 3 con click derecho en el archivo index y abrir con live server ( si no lo tienen se debe instalar en visual estudio la extension live server)
@@ -128,6 +146,8 @@ esto abre una ventana en el navegador mostrando las terjetas de los dispositivos
 ## 👨‍💻 Autor
 
 Desarrollado por Salvador Carlos
+
+Actualmente modificandose por Juliana Saez
 
 ---
 

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Equipos | Telemetría</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8f9fa; }
+    #sidebar { height: 100vh; position: fixed; width: 220px; }
+    .main-content { margin-left: 220px; padding: 20px; }
+    .card-equipo { transition: transform 0.2s; border-top: 4px solid #6c757d; }
+    .card-equipo.activo { border-top-color: #198754; }
+    .card-equipo.mantenimiento { border-top-color: #ffc107; }
+    .card-equipo:hover { transform: scale(1.02); }
+  </style>
+</head>
+<body>
+
+  <!-- Barra Lateral (Sidebar) -->
+  <nav id="sidebar" class="bg-dark text-white p-3">
+    <h4 class="mb-4 text-center">🩺 Telemetría</h4>
+    <ul class="nav flex-column">
+      <li class="nav-item mb-2"><a href="panel.html" class="nav-link text-white">📊 Panel (Index)</a></li>
+      <li class="nav-item mb-2"><a href="pacientes.html" class="nav-link text-white">👥 Pacientes</a></li>
+      <li class="nav-item mb-2"><a href="equipos.html" class="nav-link text-info fw-bold">📻 Equipos</a></li>
+      <li class="nav-item mb-2"><a href="sensores.html" class="nav-link text-white">📈 Sensores</a></li>
+      <li class="nav-item mb-2"><a href="alarmas.html" class="nav-link text-white">⚠️ Alarmas</a></li>
+    </ul>
+    <div class="mt-auto pt-4">
+      <button class="btn btn-outline-danger w-100" onclick="cerrarSesion()">Cerrar Sesión</button>
+    </div>
+  </nav>
+
+  <!-- Contenido Principal -->
+  <div class="main-content">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h3>Lista de Equipos</h3>
+      <button class="btn btn-success d-none" id="btn-nuevo-dispositivo" onclick="abrirModal()">+ Nuevo Dispositivo</button>
+    </div>
+
+    <div class="row" id="contenedor-dispositivos">
+      <!-- Las tarjetas se cargan acá con JS -->
+    </div>
+  </div>
+
+  <!-- Modal para Crear/Editar -->
+  <div class="modal fade" id="modalDispositivo" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalTitle">Dispositivo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <form id="formDispositivo">
+            <input type="hidden" id="id_dispositivo">
+            <div class="mb-3">
+              <label for="uid_equipo" class="form-label">UID del Equipo</label>
+              <input type="text" class="form-control" id="uid_equipo" required>
+            </div>
+            <div class="mb-3">
+              <label for="estado" class="form-label">Estado</label>
+              <select class="form-select" id="estado">
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+                <option value="Mantenimiento">Mantenimiento</option>
+              </select>
+            </div>
+            <!-- Nuevo selector de paciente -->
+            <div class="mb-3">
+              <label for="id_paciente" class="form-label">Asignar a Paciente</label>
+              <select class="form-select" id="id_paciente">
+                <option value="">-- Sin paciente asignado --</option>
+                <!-- Las opciones se cargan dinámicamente -->
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Guardar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const API_URL = "http://localhost:8000/dispositivos";
+    const API_PACIENTES = "http://localhost:8000/pacientes"; // Endpoint de pacientes
+    const token = localStorage.getItem("token");
+    const userRole = localStorage.getItem("userRole");
+    const modal = new bootstrap.Modal(document.getElementById('modalDispositivo'));
+
+    // Seguridad Frontend
+    if (!token) window.location.replace("../login.html");
+    if (userRole === "admin") document.getElementById("btn-nuevo-dispositivo").classList.remove("d-none");
+
+    // Función para llenar el <select> de pacientes
+    async function cargarPacientesSelect() {
+      try {
+        const res = await fetch(API_PACIENTES, { headers: { "Authorization": `Bearer ${token}` } });
+        if (!res.ok) return;
+        const pacientes = await res.json();
+        
+        const select = document.getElementById("id_paciente");
+        // Limpiamos y dejamos la opción default
+        select.innerHTML = '<option value="">-- Sin paciente asignado --</option>';
+        
+        pacientes.forEach(p => {
+          select.innerHTML += `<option value="${p.id_paciente}">${p.nombre} ${p.apellido} (DNI: ${p.dni})</option>`;
+        });
+      } catch (e) {
+        console.error("Error al cargar lista de pacientes:", e);
+      }
+    }
+
+    async function cargarDispositivos() {
+      try {
+        const res = await fetch(API_URL, { headers: { "Authorization": `Bearer ${token}` } });
+        const data = await res.json();
+        const contenedor = document.getElementById("contenedor-dispositivos");
+        contenedor.innerHTML = "";
+
+        data.forEach(d => {
+          // 1. Lógica dinámica para el título de la tarjeta
+          let tituloCard = "";
+          
+          // Chequeamos si el backend nos envió el objeto "paciente" anidado con sus datos
+          if (d.paciente && d.paciente.nombre) {
+            const nombreCompleto = `${d.paciente.nombre} ${d.paciente.apellido}`;
+            tituloCard = `Equipo: ${nombreCompleto} (${d.uid_equipo})`;
+          } 
+          // Si solo nos manda el ID numérico (fallback)
+          else if (d.id_paciente) {
+            tituloCard = `Equipo: Paciente ID ${d.id_paciente} (${d.uid_equipo})`;
+          } 
+          // Si el id_paciente es null (Sin asociar)
+          else {
+            tituloCard = `Equipo: ${d.uid_equipo} (Sin Asociar)`;
+          }
+
+          // 2. Preparamos los datos para el botón editar
+          const idPacParaModal = d.id_paciente || "";
+
+          // 3. Botones de administrador
+          const botonesAdmin = userRole === "admin" ? `
+            <div class="mt-3 text-end pt-2 border-top">
+              <button class="btn btn-sm btn-outline-primary" onclick="abrirModal(${d.id_dispositivo}, '${d.uid_equipo}', '${d.estado}', '${idPacParaModal}')">Editar</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="eliminarDispositivo(${d.id_dispositivo})">Eliminar</button>
+            </div>
+          ` : "";
+
+          // 4. Estilos visuales
+          const estadoColor = d.estado === "Activo" ? "success" : (d.estado === "Mantenimiento" ? "warning" : "secondary");
+          const cardBorderClass = d.estado === "Activo" ? "activo" : (d.estado === "Mantenimiento" ? "mantenimiento" : "");
+
+          // 5. Renderizado del HTML de la tarjeta
+          contenedor.innerHTML += `
+            <div class="col-md-4 mb-3">
+              <div class="card card-equipo shadow-sm ${cardBorderClass}">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <!-- Aquí inyectamos el título dinámico que armamos arriba -->
+                    <h5 class="card-title text-dark m-0">📻 ${tituloCard}</h5>
+                  </div>
+                  <span class="badge bg-${estadoColor} mb-2">${d.estado}</span>
+                  ${botonesAdmin}
+                </div>
+              </div>
+            </div>
+          `;
+        });
+      } catch (e) { 
+        alert("Error al cargar dispositivos"); 
+      }
+    }
+    function abrirModal(id = "", uid = "", estado = "Activo", id_paciente = "") {
+      document.getElementById("id_dispositivo").value = id;
+      document.getElementById("uid_equipo").value = uid;
+      document.getElementById("estado").value = estado;
+      document.getElementById("id_paciente").value = id_paciente;
+      document.getElementById("modalTitle").innerText = id ? "Editar Dispositivo" : "Nuevo Dispositivo";
+      modal.show();
+    }
+
+    document.getElementById("formDispositivo").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const id = document.getElementById("id_dispositivo").value;
+      const pacienteSeleccionado = document.getElementById("id_paciente").value;
+      
+      const payload = {
+        uid_equipo: document.getElementById("uid_equipo").value,
+        estado: document.getElementById("estado").value,
+        // Si el valor está vacío, enviamos null al backend para desasociar
+        id_paciente: pacienteSeleccionado ? parseInt(pacienteSeleccionado) : null
+      };
+
+      const url = id ? `${API_URL}/${id}` : API_URL;
+      const method = id ? "PATCH" : "POST"; // Asegurate de que tu backend acepte PATCH o PUT para actualizar
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+        
+        if (res.ok) {
+          modal.hide();
+          cargarDispositivos();
+        } else {
+          const err = await res.json();
+          alert(err.detail || "Error al guardar");
+        }
+      } catch (error) { alert("Error de conexión"); }
+    });
+
+    async function eliminarDispositivo(id) {
+      if (!confirm("¿Seguro que deseas eliminar este dispositivo?")) return;
+      try {
+        const res = await fetch(`${API_URL}/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+        if (res.ok) cargarDispositivos();
+        else alert("Error al eliminar.");
+      } catch (e) { alert("Error de conexión"); }
+    }
+
+    function cerrarSesion() {
+      localStorage.clear();
+      window.location.replace("../login.html");
+    }
+
+    // Iniciar: Cargar primero los pacientes para el select, y luego los dispositivos
+    cargarPacientesSelect().then(() => cargarDispositivos());
+  </script>
+</body>
+</html>

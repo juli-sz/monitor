@@ -5,13 +5,15 @@ from contextlib import asynccontextmanager
 import datetime
 from typing import Optional
 import asyncio
-
+from routes.dispositivos import router as dispositivos_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException, Depends
 from paho.mqtt.client import Client as MQTTClient, CallbackAPIVersion
 from fastapi import FastAPI
 from sqlalchemy.orm import Session
 
+import models
+from models import Dispositivo, Paciente, PacienteDispositivo, ECG, LecturaPNI, LecturaGeneral
 from services.signal_processor import ecg_filter_realtime
 from database import Base, engine, get_db
 
@@ -19,9 +21,12 @@ from database import Base, engine, get_db
 from routes.websockets import router as ws_router
 from routes.pacientes import router as pacientes_router
 from routes.historico import router as historico_router
+from routes.auth import router as auth_router
 from services.websocket_manager import ws_manager
 from services.mqtt_service import iniciar_mqtt, detener_mqtt
 
+# Revisa todos los modelos y crea las tablas que falten en PostgreSQL
+models.Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -61,6 +66,33 @@ app.include_router(ws_router)
 # ENDPOINTS
 # ======================================================
 
+@app.get("/pacientes_por_dispositivo_uid/{uid_equipo}") # O @router.get si usás routers
+def obtener_paciente_por_uid(uid_equipo: str, db: Session = Depends(get_db)):
+    # 1. Buscamos el dispositivo por su UID
+    dispositivo = db.query(Dispositivo).filter(Dispositivo.uid_equipo == uid_equipo).first()
+    
+    if not dispositivo:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+        
+    # 2. Buscamos la asociación ACTIVA en la tabla intermedia
+    asoc_activa = db.query(PacienteDispositivo).filter(
+        PacienteDispositivo.id_dispositivo == dispositivo.id_dispositivo,
+        PacienteDispositivo.fecha_hora_disoc == None
+    ).first()
+
+    # Si no hay asociación activa, tiramos 404 para que el frontend ponga "(Sin Asociar)"
+    if not asoc_activa or not asoc_activa.paciente:
+        raise HTTPException(status_code=404, detail="Dispositivo sin paciente asignado")
+        
+    # 3. Si todo está bien, devolvemos los datos del paciente para la tarjeta
+    return {
+        "id_paciente": asoc_activa.paciente.id_paciente,
+        "nombre": asoc_activa.paciente.nombre,
+        "apellido": asoc_activa.paciente.apellido,
+        "dni": asoc_activa.paciente.dni
+    }
+
+
 @app.get("/")
 async def root():
     return {"message": "API funcionando correctamente"}
@@ -69,4 +101,6 @@ async def root():
 app.include_router(ws_router)
 app.include_router(pacientes_router)
 app.include_router(historico_router)
+app.include_router(dispositivos_router)
+app.include_router(auth_router)
 

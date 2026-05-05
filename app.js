@@ -1,4 +1,17 @@
 // ==========================================
+// CONTROL DE ACCESO (GUARDIA DE SEGURIDAD)
+// ==========================================
+const token = localStorage.getItem("token");
+
+// Si no hay token guardado en el navegador, lo pateamos al login
+if (!token) {
+  window.location.replace("../login.html");
+  throw new Error("Usuario no autenticado. Deteniendo ejecución.");
+}
+
+console.log("✅ Usuario autenticado. Iniciando sistema...");
+
+// ==========================================
 // CONFIGURACIÓN DE RUTAS
 // ==========================================
 const CONFIG = {
@@ -33,7 +46,11 @@ async function getNombrePacientePorUid(uid_equipo) {
   }
   
   try {
-    const resp = await fetch(`${CONFIG.API_BASE_URL}/pacientes_por_dispositivo_uid/${uid_equipo}`);
+    // Agregamos el Token en los Headers para cuando el backend esté asegurado
+    const resp = await fetch(`${CONFIG.API_BASE_URL}/pacientes_por_dispositivo_uid/${uid_equipo}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    
     if (!resp.ok) throw new Error("No encontrado");
     
     const paciente = await resp.json();
@@ -52,7 +69,7 @@ async function getNombrePacientePorUid(uid_equipo) {
 
 async function verificarAlertas(uid, id_paciente) {
   const ahora = Date.now();
-  // Evitamos hacer spam al backend: Si pasaron menos de 5 segundos, ignoramos la petición
+  // Evitamos hacer spam al backend
   if (ultimasAlertasCheck[uid] && (ahora - ultimasAlertasCheck[uid] < CONFIG.INTERVALO_ALERTAS_MS)) {
     return; 
   }
@@ -60,16 +77,22 @@ async function verificarAlertas(uid, id_paciente) {
 
   try {
     // 1. Intentar resolver alertas pendientes
-    await fetch(`${CONFIG.API_BASE_URL}/alertas/resolver_si_corresponde/${id_paciente}`, { method: "POST" });
+    await fetch(`${CONFIG.API_BASE_URL}/alertas/resolver_si_corresponde/${id_paciente}`, { 
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
 
     // 2. Traer alertas activas
-    const res = await fetch(`${CONFIG.API_BASE_URL}/alertas/${id_paciente}?estado=ACTIVA`);
+    const res = await fetch(`${CONFIG.API_BASE_URL}/alertas/${id_paciente}?estado=ACTIVA`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    
     const alertas = await res.json();
     
     const card = document.getElementById(`card-${uid}`);
     if (!card) return;
 
-    if (alertas.length > 0) {
+    if (alertas && alertas.length > 0) {
       card.classList.add("alerta-activa");
     } else {
       card.classList.remove("alerta-activa");
@@ -142,6 +165,8 @@ function crearTarjetaPaciente(uid, nombrePaciente) {
 let ws;
 
 function conectarWebSocket() {
+  // Nota: Los WebSockets estándar en navegadores no soportan enviar Headers personalizados (como Authorization).
+  // Si en el futuro querés asegurar el WebSocket, el token se envía por la URL: ws://...?token=...
   ws = new WebSocket(CONFIG.WS_URL);
 
   ws.onopen = () => {
@@ -155,7 +180,7 @@ function conectarWebSocket() {
 
   ws.onerror = (err) => {
     console.error("Error en WebSocket:", err);
-    ws.close(); // Forzamos el cierre para que onclose dispare la reconexión
+    ws.close(); 
   };
 
   ws.onmessage = async (event) => {
@@ -190,17 +215,16 @@ function conectarWebSocket() {
         actualizarCampo(uid, "temperatura", `${payload.value ?? "--"} °C`);
       } 
       else if (sensor === "pulso" && payload.value !== undefined) {
-        // NOTA: Algoritmo de pulso a revisar (año 2026) según pruebas con Carlos.
         actualizarCampo(uid, "pulso", `${payload.value} bpm`);
       }
 
       actualizarCampo(uid, "last-update", `Actualizado: ${timestamp}`);
 
-      // 3. Chequeo de alertas (Controlado por el Throttle)
-      // Para saber el ID del paciente, tendríamos que buscarlo. 
-      // Por ahora usamos una solución rápida consultando la API:
+      // 3. Chequeo de alertas
       try {
-        const resPaciente = await fetch(`${CONFIG.API_BASE_URL}/pacientes_por_dispositivo_uid/${uid}`);
+        const resPaciente = await fetch(`${CONFIG.API_BASE_URL}/pacientes_por_dispositivo_uid/${uid}`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
         if (resPaciente.ok) {
           const paciente = await resPaciente.json();
           verificarAlertas(uid, paciente.id_paciente);

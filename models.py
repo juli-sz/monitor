@@ -1,14 +1,32 @@
 from sqlalchemy import (
     Column, Integer, String, Date, Text, ForeignKey,
-    TIMESTAMP, Numeric, ARRAY, CheckConstraint
+    TIMESTAMP, Numeric, ARRAY, CheckConstraint, Boolean
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base # ¡Importante! Importamos la Base que creamos en database.py
 
+class Usuario(Base):
+    __tablename__ = "usuario"
+    id_usuario = Column(Integer, primary_key=True, index=True)
+    email = Column(String(150), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    nombre = Column(String(100), nullable=False)
+    
+    # Restringimos estrictamente los roles permitidos
+    rol = Column(
+        String(50), 
+        CheckConstraint("rol IN ('admin', 'medico', 'enfermero', 'visor')"), 
+        nullable=False
+    )
+    
+    activo = Column(Boolean, default=True) # Para dar de baja sin borrar el registro
+    creado_en = Column(TIMESTAMP(timezone=True), default=func.now())
+
 class Paciente(Base):
     __tablename__ = "paciente"
     id_paciente = Column(Integer, primary_key=True, index=True)
+    dni = Column(String(20), unique=True, index=True)
     nombre = Column(String(100), nullable=False)
     apellido = Column(String(100), nullable=False)
     fecha_nacimiento = Column(Date)
@@ -26,7 +44,6 @@ class Paciente(Base):
     rangos_signos_vitales = relationship("RangoSignoVital", back_populates="paciente_rel")
     alertas = relationship("Alerta", back_populates="paciente_rel")
 
-
 class Dispositivo(Base):
     __tablename__ = "dispositivo"
     id_dispositivo = Column(Integer, primary_key=True, index=True)
@@ -41,7 +58,6 @@ class Dispositivo(Base):
     ecg_bloques = relationship("ECG", back_populates="dispositivo_rel")
     lecturas_pni = relationship("LecturaPNI", back_populates="dispositivo_rel")
     alertas = relationship("Alerta", back_populates="dispositivo_rel")
-
 
 class PacienteDispositivo(Base):
     __tablename__ = "paciente_dispositivo"

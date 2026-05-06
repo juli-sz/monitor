@@ -25,6 +25,8 @@ const CONFIG = {
 // ==========================================
 const equipoToPaciente = {};
 const ultimasAlertasCheck = {}; // Guarda cuándo fue la última vez que revisamos alertas por UID
+let umbralesGlobales = {};
+let alarmasActivas = {};
 
 // ==========================================
 // UI & EVENTOS BÁSICOS
@@ -46,7 +48,6 @@ async function getNombrePacientePorUid(uid_equipo) {
   }
   
   try {
-    // Agregamos el Token en los Headers para cuando el backend esté asegurado
     const resp = await fetch(`${CONFIG.API_BASE_URL}/pacientes_por_dispositivo_uid/${uid_equipo}`, {
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -67,28 +68,71 @@ async function getNombrePacientePorUid(uid_equipo) {
   return equipoToPaciente[uid_equipo];
 }
 
+async function cargarUmbrales() {
+    try {
+        const res = await fetch("http://localhost:8000/sensores", {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        data.forEach(u => {
+            umbralesGlobales[u.tipo_signo.toLowerCase()] = { 
+                min: parseFloat(u.valor_minimo), 
+                max: parseFloat(u.valor_maximo) 
+            };
+        });
+    } catch (e) { console.error("Error cargando umbrales:", e); }
+}
+cargarUmbrales();
+
+function evaluarUmbral(uid, sensor, valorNumerico, valorTexto) {
+    const umbral = umbralesGlobales[sensor.toLowerCase()];
+    if (!umbral) return; // Si no hay umbral configurado, ignoramos
+
+    const tarjeta = document.getElementById(`card-${uid}`);
+    if (!tarjeta) return;
+
+    const claveAlarma = `${uid}-${sensor}`;
+    const esAnomalia = valorNumerico < umbral.min || valorNumerico > umbral.max;
+
+    if (esAnomalia) {
+        tarjeta.classList.add("alerta-activa");
+        if (!alarmasActivas[claveAlarma]) {
+            alarmasActivas[claveAlarma] = true;
+            fetch("http://localhost:8000/alertas", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ uid_equipo: uid, sensor: sensor, valor: valorTexto })
+            });
+        }
+    } else {
+        tarjeta.classList.remove("alerta-activa");
+        if (alarmasActivas[claveAlarma]) {
+            delete alarmasActivas[claveAlarma];
+        }
+    }
+}
+
 async function verificarAlertas(uid, id_paciente) {
   const ahora = Date.now();
-  // Evitamos hacer spam al backend
   if (ultimasAlertasCheck[uid] && (ahora - ultimasAlertasCheck[uid] < CONFIG.INTERVALO_ALERTAS_MS)) {
     return; 
   }
   ultimasAlertasCheck[uid] = ahora;
 
   try {
-    // 1. Intentar resolver alertas pendientes
     await fetch(`${CONFIG.API_BASE_URL}/alertas/resolver_si_corresponde/${id_paciente}`, { 
       method: "POST",
       headers: { "Authorization": `Bearer ${token}` }
     });
 
-    // 2. Traer alertas activas
     const res = await fetch(`${CONFIG.API_BASE_URL}/alertas/${id_paciente}?estado=ACTIVA`, {
       headers: { "Authorization": `Bearer ${token}` }
     });
     
     const alertas = await res.json();
-    
     const card = document.getElementById(`card-${uid}`);
     if (!card) return;
 
@@ -150,7 +194,6 @@ function crearTarjetaPaciente(uid, nombrePaciente) {
     
   contenedor.appendChild(col);
 
-  // Evento para ir al gráfico detallado
   const consultarBtn = col.querySelector(`button[data-uid="${uid}"]`);
   if (consultarBtn) {
     consultarBtn.addEventListener("click", () => {
@@ -165,8 +208,6 @@ function crearTarjetaPaciente(uid, nombrePaciente) {
 let ws;
 
 function conectarWebSocket() {
-  // Nota: Los WebSockets estándar en navegadores no soportan enviar Headers personalizados (como Authorization).
-  // Si en el futuro querés asegurar el WebSocket, el token se envía por la URL: ws://...?token=...
   ws = new WebSocket(CONFIG.WS_URL);
 
   ws.onopen = () => {
@@ -194,18 +235,26 @@ function conectarWebSocket() {
       const timestamp = new Date().toLocaleTimeString();
       let nombrePaciente = await getNombrePacientePorUid(uid);
 
-      // 1. Crear o actualizar UI
       if (!document.getElementById(`card-${uid}`)) {
         crearTarjetaPaciente(uid, nombrePaciente);
       } else {
         actualizarTituloTarjeta(uid, nombrePaciente);
       }
 
-      // 2. Parsear Sensores
+      // ==========================================
+      // PARSEAR Y EVALUAR SENSORES
+      // ==========================================
       if (sensor === "spo2") {
         actualizarCampo(uid, "spo2", `${payload.value ?? "--"} %`);
-        const pulso = payload.pulso || payload.Pr || "--";
-        actualizarCampo(uid, "pulso", `${pulso} bpm`);
+        if (payload.value !== undefined) {
+            evaluarUmbral(uid, "spo2", parseFloat(payload.value), `${payload.value}%`);
+        }
+
+        if (payload.pulso || payload.Pr) {
+          const pulso = payload.pulso || payload.Pr;
+          actualizarCampo(uid, "pulso", `${pulso} bpm`);
+          evaluarUmbral(uid, "pulso", parseFloat(pulso), `${pulso} bpm`);
+        }
       } 
       else if (sensor === "pni") {
         const val = payload.value ? payload.value.split("/") : ["--", "--"];
@@ -213,14 +262,19 @@ function conectarWebSocket() {
       } 
       else if (sensor === "temp" || sensor === "temperatura_piel") {
         actualizarCampo(uid, "temperatura", `${payload.value ?? "--"} °C`);
+        if (payload.value !== undefined) {
+            // Enviamos "temperatura" para que coincida con la BD
+            evaluarUmbral(uid, "temperatura", parseFloat(payload.value), `${payload.value} °C`);
+        }
       } 
-      else if (sensor === "pulso" && payload.value !== undefined) {
+      else if ((sensor === "pulso" || sensor === "bpm") && payload.value !== undefined) {
         actualizarCampo(uid, "pulso", `${payload.value} bpm`);
+        // AGREGADO: Evaluar el pulso cuando llega solo
+        evaluarUmbral(uid, "pulso", parseFloat(payload.value), `${payload.value} bpm`);
       }
 
       actualizarCampo(uid, "last-update", `Actualizado: ${timestamp}`);
 
-      // 3. Chequeo de alertas
       try {
         const resPaciente = await fetch(`${CONFIG.API_BASE_URL}/pacientes_por_dispositivo_uid/${uid}`, {
           headers: { "Authorization": `Bearer ${token}` }
@@ -229,13 +283,38 @@ function conectarWebSocket() {
           const paciente = await resPaciente.json();
           verificarAlertas(uid, paciente.id_paciente);
         }
-      } catch (e) { /* Error silencioso si no encuentra paciente */ }
+      } catch (e) { /* Error silencioso */ }
 
     } catch (e) {
       console.error("Error al procesar el mensaje:", e);
     }
   };
 }
+
+// ======================================================
+// BUSCADOR EN TIEMPO REAL
+// ======================================================
+document.addEventListener("DOMContentLoaded", () => {
+    const buscador = document.getElementById("buscador-pacientes");
+    
+    if (buscador) {
+        buscador.addEventListener("input", function() {
+            const filtro = this.value.toLowerCase();
+            const tarjetas = document.querySelectorAll(".sensor-card");
+            
+            tarjetas.forEach(tarjeta => {
+                const contenedorPadre = tarjeta.parentElement; 
+                const textoTarjeta = tarjeta.innerText.toLowerCase();
+                
+                if (textoTarjeta.includes(filtro)) {
+                    contenedorPadre.style.display = ""; 
+                } else {
+                    contenedorPadre.style.display = "none"; 
+                }
+            });
+        });
+    }
+});
 
 // Iniciar la conexión al cargar el script
 conectarWebSocket();

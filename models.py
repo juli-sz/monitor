@@ -153,6 +153,6 @@ class Alerta(Base):
     resuelta_en = Column(TIMESTAMP(timezone=True))
     creado_en = Column(TIMESTAMP(timezone=True), default=func.now())
     actualizado_en = Column(TIMESTAMP(timezone=True), default=func.now(), onupdate=func.now())
-
+    
     paciente_rel = relationship("Paciente", back_populates="alertas")
     dispositivo_rel = relationship("Dispositivo", back_populates="alertas")

@@ -90,10 +90,23 @@ def calculate_spo2(ppg_r, ppg_ir):
 # --- Publicación de datos ---
 def publicar_datos_sensores():
     timestamp = int(time.time())
-    uid_equipo = "rtrt-rtrtr-rtrtr2"
+    uid_equipo = "Eq2"
 
-    # ECG
-    ecg_values = generate_ecg_wave(num_samples=500, heart_rate_bpm=random.randint(60, 100))
+    # 1. Generamos UN SOLO valor de BPM para sincronizar todo
+    bpm_value = random.randint(60, 100)
+
+    # 2. Publicamos el tópico específico de BPM
+    payload_bpm = {
+        "Uid_Equipo": uid_equipo,
+        "Date": timestamp,
+        "value": bpm_value,
+        "mode": "active"
+    }
+    client.publish(f"{TOPICO_BASE}/bpm", json.dumps(payload_bpm))
+    print(f"📤 BPM publicado ({bpm_value} bpm) en {TOPICO_BASE}/bpm")
+
+    # 3. Usamos ese bpm_value para la onda ECG
+    ecg_values = generate_ecg_wave(num_samples=500, heart_rate_bpm=bpm_value)
     payload_ecg = {
         "Uid_Equipo": uid_equipo,
         "Date": timestamp,
@@ -105,8 +118,8 @@ def publicar_datos_sensores():
     client.publish(f"{TOPICO_BASE}/ecg", json.dumps(payload_ecg))
     print(f"📤 ECG publicado en {TOPICO_BASE}/ecg")
 
-    # SpO₂
-    spo2_r, spo2_ir = generate_ppg_wave(num_samples=100, heart_rate_bpm=random.randint(60, 100))
+    # 4. Usamos ese bpm_value para la onda SpO₂
+    spo2_r, spo2_ir = generate_ppg_wave(num_samples=100, heart_rate_bpm=bpm_value)
     spo2_value = calculate_spo2(spo2_r, spo2_ir)
     payload_spo2 = {
         "Uid_Equipo": uid_equipo,
@@ -143,6 +156,7 @@ def publicar_datos_sensores():
     }
     client.publish(f"{TOPICO_BASE}/temperatura_piel", json.dumps(payload_temp))
     print(f"📤 Temperatura publicada ({temp_value} °C) en {TOPICO_BASE}/temperatura_piel")
+    print("-" * 40)
 
 # --- Main ---
 def main():

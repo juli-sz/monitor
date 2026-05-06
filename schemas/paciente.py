@@ -21,6 +21,7 @@ class PacienteCreate(PacienteBase):
 class PacienteUpdate(BaseModel):
     nombre: Optional[str] = Field(None, max_length=100)
     apellido: Optional[str] = Field(None, max_length=100)
+    dni: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     direccion: Optional[str] = None
     sexo: Optional[str] = Field(None, pattern="^[MF]$")

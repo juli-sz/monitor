@@ -5,7 +5,9 @@ from contextlib import asynccontextmanager
 import datetime
 from typing import Optional
 import asyncio
+from routes.alertas import router as alertas_router
 from routes.dispositivos import router as dispositivos_router
+from routes.sensores import router as sensores_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException, Depends
 from paho.mqtt.client import Client as MQTTClient, CallbackAPIVersion
@@ -103,4 +105,6 @@ app.include_router(pacientes_router)
 app.include_router(historico_router)
 app.include_router(dispositivos_router)
 app.include_router(auth_router)
+app.include_router(alertas_router)
+app.include_router(sensores_router)
 

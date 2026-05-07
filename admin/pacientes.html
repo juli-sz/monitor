@@ -7,15 +7,13 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body { background-color: #f8f9fa; }
-    #sidebar { height: 100vh; position: fixed; width: 220px; }
+    #sidebar { height: 100vh; position: fixed; width: 220px; top: 0; left: 0; }
     .main-content { margin-left: 220px; padding: 20px; }
-    .card-paciente { border-left: 5px solid #0d6efd; transition: transform 0.2s; }
-    .card-paciente:hover { transform: scale(1.02); }
+    .table-historico { opacity: 0.85; background-color: #fcfcfc; }
   </style>
 </head>
 <body>
 
-  <!-- Barra Lateral (Sidebar) -->
   <nav id="sidebar" class="bg-dark text-white p-3">
     <h4 class="mb-4 text-center">🩺 Telemetría</h4>
     <ul class="nav flex-column">
@@ -30,48 +28,121 @@
     </div>
   </nav>
 
-  <!-- Contenido Principal -->
   <div class="main-content">
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h3>Lista de Pacientes</h3>
-      <button class="btn btn-success d-none" id="btn-nuevo-paciente" onclick="abrirModal()">+ Nuevo Paciente</button>
+      <h3 class="m-0">Directorio de Pacientes</h3>
+      
+      <div class="w-25 mx-3">
+        <input type="text" id="buscador-pacientes" class="form-control" placeholder="🔍 Buscar por nombre o DNI...">
+      </div>
+      
+      <button class="btn btn-success d-none" id="btn-crear-paciente" onclick="prepararCreacion()">+ Registrar Paciente</button>
     </div>
 
-    <div class="row" id="contenedor-pacientes"></div>
+    <div class="card shadow-sm mb-4 border-success">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="m-0 text-success fw-bold">🟢 Pacientes Activos en Monitoreo</h5>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#collapseActivos">Minimizar / Expandir</button>
+      </div>
+      <div class="collapse show" id="collapseActivos">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr><th>DNI</th><th>Nombre Completo</th><th>Área / Tipo</th><th>Diagnóstico</th><th class="text-end">Acciones</th></tr>
+              </thead>
+              <tbody id="tabla-pacientes-activos">
+                <tr><td colspan="5" class="text-center text-muted py-3">Cargando pacientes...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-secondary">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="m-0 text-secondary fw-bold">📁 Historial de Pacientes (Egresados)</h5>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#collapseHistoricos">Minimizar / Expandir</button>
+      </div>
+      <div class="collapse show" id="collapseHistoricos">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-historico">
+              <thead class="table-light">
+                <tr><th>DNI</th><th>Nombre Completo</th><th>Fecha Egreso</th><th>Diagnóstico Final</th><th class="text-end">Acciones</th></tr>
+              </thead>
+              <tbody id="tabla-pacientes-historicos">
+                <tr><td colspan="5" class="text-center text-muted py-3">Cargando historial...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Modal -->
   <div class="modal fade" id="modalPaciente" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modalTitle">Paciente</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="modalTitulo">Registrar Nuevo Paciente</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
           <form id="formPaciente">
-            <input type="hidden" id="id_paciente">
-            <div class="mb-3">
-              <label for="nombre" class="form-label">Nombre</label>
-              <input type="text" class="form-control" id="nombre" required>
+            <input type="hidden" id="p-id">
+            
+            <h6 class="text-primary border-bottom pb-1">👤 Datos Personales</h6>
+            <div class="row mb-3 mt-2">
+              <div class="col-md-4"><label class="form-label">Nombre</label><input type="text" class="form-control" id="p-nombre" required></div>
+              <div class="col-md-4"><label class="form-label">Apellido</label><input type="text" class="form-control" id="p-apellido" required></div>
+              <div class="col-md-4"><label class="form-label">DNI</label><input type="text" class="form-control" id="p-dni" required></div>
             </div>
-            <div class="mb-3">
-              <label for="apellido" class="form-label">Apellido</label>
-              <input type="text" class="form-control" id="apellido" required>
+            <div class="row mb-3">
+              <div class="col-md-4"><label class="form-label">Fecha Nacimiento</label><input type="date" class="form-control" id="p-fecha-nac"></div>
+              <div class="col-md-4"><label class="form-label">Sexo</label><select class="form-select" id="p-sexo"><option value="M">Masculino</option><option value="F">Femenino</option></select></div>
+              <div class="col-md-4"><label class="form-label">Dirección</label><input type="text" class="form-control" id="p-direccion"></div>
             </div>
-            <div class="mb-3">
-              <label for="dni" class="form-label">DNI</label>
-              <input type="text" class="form-control" id="dni" required>
+
+            <h6 class="text-primary border-bottom pb-1 mt-4">🏥 Información Clínica</h6>
+            <div class="row mb-3 mt-2">
+              <div class="col-md-4"><label class="form-label">Área</label><select class="form-select" id="p-tipo"><option value="Terapia Intensiva">UTI</option><option value="Guardia">Emergencias</option><option value="Sala Común">Piso</option></select></div>
+              <div class="col-md-4"><label class="form-label">Diagnóstico</label><input type="text" class="form-control" id="p-diagnostico"></div>
+              <div class="col-md-4">
+                  <label class="form-label text-danger fw-bold">Fecha de Alta / Egreso</label>
+                  <input type="date" class="form-control border-danger" id="p-fecha-egreso" title="Si completás esta fecha, el paciente pasará a estar INACTIVO.">
+              </div>
             </div>
-            <div class="mb-3">
-              <label for="sexo" class="form-label">Sexo</label>
-              <select class="form-select" id="sexo">
-                <option value="M">Masculino</option>
-                <option value="F">Femenino</option>
-                <option value="Otro">Otro</option>
-              </select>
+
+            <h6 class="text-primary border-bottom pb-1 mt-4">⚙️ Umbrales Personalizados</h6>
+            <div class="row mb-2">
+                <div class="col-md-4 fw-bold">SpO2 % (Min/Max)</div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-spo2-min"></div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-spo2-max"></div>
             </div>
-            <button type="submit" class="btn btn-primary w-100">Guardar</button>
+            <div class="row mb-2">
+                <div class="col-md-4 fw-bold">Pulso Cardíaco BPM</div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-pulso-min"></div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-pulso-max"></div>
+            </div>
+            <div class="row mb-2">
+                <div class="col-md-4 fw-bold">Temp. Piel (°C)</div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-temp-min"></div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-temp-max"></div>
+            </div>
+            <div class="row mb-2">
+                <div class="col-md-4 fw-bold">P. Sistólica (mmHg)</div>
+                <div class="col-md-4"><input type="number" step="1" class="form-control" id="u-sistolica-min"></div>
+                <div class="col-md-4"><input type="number" step="1" class="form-control" id="u-sistolica-max"></div>
+            </div>
+            <div class="row mb-4">
+                <div class="col-md-4 fw-bold">P. Diastólica (mmHg)</div>
+                <div class="col-md-4"><input type="number" step="1" class="form-control" id="u-diastolica-min"></div>
+                <div class="col-md-4"><input type="number" step="1" class="form-control" id="u-diastolica-max"></div>
+            </div>
+
+            <button type="submit" class="btn btn-success w-100 py-2 mt-2 fw-bold" id="btnGuardar">Guardar Paciente</button>
           </form>
         </div>
       </div>
@@ -80,93 +151,203 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    const API_URL = "http://localhost:8000/pacientes";
+    const API_PACIENTES = "http://localhost:8000/pacientes";
+    const API_SENSORES = "http://localhost:8000/sensores";
     const token = localStorage.getItem("token");
     const userRole = localStorage.getItem("userRole");
-    const modal = new bootstrap.Modal(document.getElementById('modalPaciente'));
+    const modalInstance = new bootstrap.Modal(document.getElementById('modalPaciente'));
 
-    // Seguridad
     if (!token) window.location.replace("../login.html");
-    if (userRole === "admin") document.getElementById("btn-nuevo-paciente").classList.remove("d-none");
 
+    // CONTROL DE ROLES: Solo Admin y Médico pueden crear/editar
+    const puedeEditar = (userRole === "admin" || userRole === "medico");
+    if (puedeEditar) {
+        document.getElementById("btn-crear-paciente").classList.remove("d-none");
+    }
+
+    // 1. CARGAR LISTAS Y SEPARARLAS
     async function cargarPacientes() {
       try {
-        const res = await fetch(API_URL, { headers: { "Authorization": `Bearer ${token}` } });
-        const data = await res.json();
-        const contenedor = document.getElementById("contenedor-pacientes");
-        contenedor.innerHTML = "";
+          const res = await fetch(API_PACIENTES, { headers: { "Authorization": `Bearer ${token}` }});
+          const pacientes = await res.json();
+          
+          const tbActivos = document.getElementById("tabla-pacientes-activos");
+          const tbHistoricos = document.getElementById("tabla-pacientes-historicos");
+          
+          tbActivos.innerHTML = "";
+          tbHistoricos.innerHTML = "";
 
-        data.forEach(p => {
-          const botonesAdmin = userRole === "admin" ? `
-            <div class="mt-3 pt-2 border-top">
-              <button class="btn btn-sm btn-outline-primary" onclick="abrirModal(${p.id_paciente}, '${p.nombre}', '${p.apellido}', '${p.dni}', '${p.sexo}')">Editar</button>
-              <button class="btn btn-sm btn-outline-danger float-end" onclick="eliminarPaciente(${p.id_paciente})">Dar de Baja</button>
-            </div>
-          ` : "";
+          let countActivos = 0;
+          let countHistoricos = 0;
 
-          contenedor.innerHTML += `
-            <div class="col-md-4 mb-3">
-              <div class="card card-paciente shadow-sm">
-                <div class="card-body">
-                  <h5 class="card-title text-dark">${p.nombre} ${p.apellido}</h5>
-                  <p class="card-text mb-0 text-muted"><small>DNI: ${p.dni}</small></p>
-                  <p class="card-text mb-1 text-muted"><small>Sexo: ${p.sexo}</small></p>
-                  ${botonesAdmin}
-                </div>
-              </div>
-            </div>
-          `;
-        });
-      } catch (e) { alert("Error al cargar pacientes"); }
+          pacientes.forEach(p => {
+            const btnEditar = puedeEditar ? `<button class="btn btn-sm btn-outline-primary ms-1" onclick="editarPaciente(${p.id_paciente})">Editar</button>` : '';
+            const btnEliminar = (userRole === "admin") ? `<button class="btn btn-sm btn-outline-danger ms-1" onclick="eliminarPaciente(${p.id_paciente})">Borrar</button>` : '';
+
+            // Lógica de separación: Si tiene fecha de egreso, va a históricos
+            if (p.fecha_egreso) {
+                countHistoricos++;
+                // Formateamos la fecha visualmente
+                const fEgresoLimpia = p.fecha_egreso.split("T")[0];
+                tbHistoricos.innerHTML += `<tr class="fila-paciente">
+                  <td>${p.dni}</td>
+                  <td class="nombre-busqueda fw-bold">${p.nombre} ${p.apellido}</td>
+                  <td class="text-danger fw-bold">${fEgresoLimpia}</td>
+                  <td>${p.diagnostico || '-'}</td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-primary ms-1" onclick="verDetalle(${p.id_paciente})">👁 Ver</button>
+                    ${btnEditar} ${btnEliminar}
+                  </td>
+                </tr>`;
+            } else {
+                countActivos++;
+                tbActivos.innerHTML += `<tr class="fila-paciente">
+                  <td>${p.dni}</td>
+                  <td class="nombre-busqueda fw-bold text-success">${p.nombre} ${p.apellido}</td>
+                  <td><span class="badge bg-info text-dark">${p.tipo || 'Sala Común'}</span></td>
+                  <td>${p.diagnostico || '-'}</td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-primary ms-1" onclick="verDetalle(${p.id_paciente})">👁 Ver</button>
+                    ${btnEditar}
+                  </td>
+                </tr>`;
+            }
+          });
+
+          if (countActivos === 0) tbActivos.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No hay pacientes activos.</td></tr>';
+          if (countHistoricos === 0) tbHistoricos.innerHTML = '<tr><td colspan="5" class="text-center text-muted">El historial está vacío.</td></tr>';
+
+      } catch (e) { console.error("Error al cargar pacientes:", e); }
     }
 
-    function abrirModal(id = "", nombre = "", apellido = "", dni = "", sexo = "M") {
-      document.getElementById("id_paciente").value = id;
-      document.getElementById("nombre").value = nombre;
-      document.getElementById("apellido").value = apellido;
-      document.getElementById("dni").value = dni;
-      document.getElementById("sexo").value = sexo;
-      document.getElementById("modalTitle").innerText = id ? "Editar Paciente" : "Nuevo Paciente";
-      modal.show();
-    }
-
-    document.getElementById("formPaciente").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const id = document.getElementById("id_paciente").value;
-      const payload = {
-        nombre: document.getElementById("nombre").value,
-        apellido: document.getElementById("apellido").value,
-        dni: document.getElementById("dni").value,
-        sexo: document.getElementById("sexo").value
-      };
-
-      const url = id ? `${API_URL}/${id}` : API_URL;
-      const method = id ? "PATCH" : "POST";
-
-      try {
-        const res = await fetch(url, {
-          method,
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-          body: JSON.stringify(payload)
+    // 2. BUSCADOR
+    document.getElementById("buscador-pacientes").addEventListener("input", function() {
+        const filtro = this.value.toLowerCase();
+        const filas = document.querySelectorAll(".fila-paciente");
+        filas.forEach(fila => {
+            const texto = fila.innerText.toLowerCase();
+            fila.style.display = texto.includes(filtro) ? "" : "none";
         });
-        
-        if (res.ok) {
-          modal.hide();
-          cargarPacientes();
-        } else {
-          const err = await res.json();
-          alert(err.detail || "Error al guardar");
-        }
-      } catch (error) { alert("Error de conexión"); }
     });
 
+    // 3. PREPARAR CREACIÓN
+    function prepararCreacion() {
+      document.getElementById("formPaciente").reset();
+      document.getElementById("p-id").value = "";
+      document.getElementById("p-fecha-egreso").value = ""; // Por defecto vacía al crear
+      document.getElementById("modalTitulo").innerText = "Registrar Nuevo Paciente";
+      modalInstance.show();
+    }
+
+    // 4. CARGAR DATOS PARA EDICIÓN
+    async function editarPaciente(id) {
+      document.getElementById("formPaciente").reset();
+      const res = await fetch(`${API_PACIENTES}/${id}`, { headers: { "Authorization": `Bearer ${token}` }});
+      const p = await res.json();
+      
+      document.getElementById("p-id").value = p.id_paciente;
+      document.getElementById("p-nombre").value = p.nombre;
+      document.getElementById("p-apellido").value = p.apellido;
+      document.getElementById("p-dni").value = p.dni;
+      document.getElementById("p-fecha-nac").value = p.fecha_nacimiento ? p.fecha_nacimiento.split("T")[0] : "";
+      document.getElementById("p-fecha-egreso").value = p.fecha_egreso ? p.fecha_egreso.split("T")[0] : "";
+      document.getElementById("p-sexo").value = p.sexo;
+      document.getElementById("p-direccion").value = p.direccion;
+      document.getElementById("p-tipo").value = p.tipo;
+      document.getElementById("p-diagnostico").value = p.diagnostico;
+
+      const resU = await fetch(`${API_SENSORES}/paciente/${id}`, { headers: { "Authorization": `Bearer ${token}` }});
+      const umbrales = await resU.json();
+      
+      umbrales.forEach(u => {
+        const type = u.tipo_signo;
+        if(document.getElementById(`u-${type}-min`)){
+            document.getElementById(`u-${type}-min`).value = u.valor_minimo;
+            document.getElementById(`u-${type}-max`).value = u.valor_maximo;
+        }
+      });
+
+      document.getElementById("modalTitulo").innerText = "Editar Paciente: " + p.nombre;
+      modalInstance.show();
+    }
+
+    // 5. ELIMINAR PACIENTE (Solo Admin)
     async function eliminarPaciente(id) {
-      if (!confirm("¿Seguro que deseas eliminar este paciente del sistema?")) return;
-      try {
-        const res = await fetch(`${API_URL}/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
-        if (res.ok) cargarPacientes();
-        else alert("Error al eliminar.");
-      } catch (e) { alert("Error de conexión"); }
+        if (!confirm("⚠️ ATENCIÓN: Esta acción borrará al paciente y sus configuraciones. ¿Estás totalmente seguro?")) return;
+        
+        try {
+            const res = await fetch(`${API_PACIENTES}/${id}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.ok) {
+                cargarPacientes();
+            } else {
+                alert("Error al intentar eliminar el paciente.");
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    // 6. GUARDAR (POST o PATCH)
+    document.getElementById("formPaciente").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const id = document.getElementById("p-id").value;
+      const metodo = id ? "PATCH" : "POST";
+      const url = id ? `${API_PACIENTES}/${id}` : `${API_PACIENTES}/`;
+
+      const payload = {
+        nombre: document.getElementById("p-nombre").value,
+        apellido: document.getElementById("p-apellido").value,
+        dni: document.getElementById("p-dni").value,
+        fecha_nacimiento: document.getElementById("p-fecha-nac").value || null,
+        fecha_egreso: document.getElementById("p-fecha-egreso").value || null, // SI TIENE FECHA, SE VA AL HISTORIAL
+        sexo: document.getElementById("p-sexo").value,
+        direccion: document.getElementById("p-direccion").value,
+        tipo: document.getElementById("p-tipo").value,
+        diagnostico: document.getElementById("p-diagnostico").value
+      };
+
+      const res = await fetch(url, {
+        method: metodo,
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const p = await res.json();
+        const idPac = p.id_paciente;
+        
+        const uPayloads = [
+          { tipo: 'spo2', min: 'u-spo2-min', max: 'u-spo2-max', unit: '%' },
+          { tipo: 'pulso', min: 'u-pulso-min', max: 'u-pulso-max', unit: 'bpm' },
+          { tipo: 'temperatura', min: 'u-temp-min', max: 'u-temp-max', unit: '°C' },
+          { tipo: 'sistolica', min: 'u-sistolica-min', max: 'u-sistolica-max', unit: 'mmHg' },
+          { tipo: 'diastolica', min: 'u-diastolica-min', max: 'u-diastolica-max', unit: 'mmHg' }
+        ];
+
+        for(const up of uPayloads) {
+          const vMin = document.getElementById(up.min).value;
+          const vMax = document.getElementById(up.max).value;
+          
+          if(vMin && vMax) {
+            await fetch(`${API_SENSORES}/`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+              body: JSON.stringify({ id_paciente: idPac, tipo_signo: up.tipo, valor_minimo: parseFloat(vMin), valor_maximo: parseFloat(vMax), unidad: up.unit })
+            });
+          }
+        }
+        modalInstance.hide();
+        cargarPacientes();
+      } else {
+        alert("Ocurrió un error al guardar el paciente. Revise los datos.");
+      }
+    });
+
+    function verDetalle(id_paciente) {
+      window.location.href = `detalle.html?id=${id_paciente}`;
     }
 
     function cerrarSesion() {
@@ -174,7 +355,6 @@
       window.location.replace("../login.html");
     }
 
-    // Iniciar
     cargarPacientes();
   </script>
 </body>

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perfil del Paciente | Telemetría</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8f9fa; }
+    #sidebar { height: 100vh; position: fixed; width: 220px; top: 0; left: 0; z-index: 1000;}
+    .main-content { margin-left: 220px; padding: 20px; }
+    .sensor-box { background: white; border-radius: 10px; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px;}
+    .sensor-val { font-size: 2rem; font-weight: bold; margin: 0; }
+  </style>
+</head>
+<body>
+
+  <nav id="sidebar" class="bg-dark text-white p-3">
+    <h4 class="mb-4 text-center">🩺 Telemetría</h4>
+    <ul class="nav flex-column">
+      <li class="nav-item mb-2"><a href="panel.html" class="nav-link text-white">⬅️ Volver al Panel</a></li>
+      <li class="nav-item mb-2"><a href="pacientes.html" class="nav-link text-white">👥 Pacientes</a></li>
+    </ul>
+  </nav>
+
+  <div class="main-content">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+      <div>
+        <h2 class="m-0 text-primary" id="nombre-paciente">Cargando paciente...</h2>
+        <p class="text-muted m-0">Conectado al equipo: <span id="uid-equipo" class="fw-bold">...</span></p>
+      </div>
+      <button class="btn btn-danger btn-lg shadow" id="btn-monitor-ecg" disabled>
+        ❤️ ABRIR MONITOR ECG
+      </button>
+    </div>
+
+    <div class="row">
+      <div class="col-md-5">
+        
+        <div class="card mb-4 shadow-sm border-0">
+          <div class="card-header bg-white text-primary fw-bold d-flex justify-content-between align-items-center">
+            <span>Historia Clínica</span>
+            <button class="btn btn-sm btn-outline-primary" id="btn-editar-paciente" onclick="abrirModalEdicion()" disabled>✏️ Editar</button>
+          </div>
+          <div class="card-body" id="datos-clinicos">
+            <div class="spinner-border text-primary" role="status"></div> Buscando en base de datos...
+          </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white text-primary fw-bold">Umbrales de Alarma Configurados</div>
+          <div class="card-body">
+            <ul class="list-group list-group-flush" id="lista-umbrales">
+              <li class="list-group-item text-muted text-center">Cargando umbrales...</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-7">
+        <div class="card shadow-sm border-0 h-100 bg-light">
+          <div class="card-header bg-white text-success fw-bold d-flex justify-content-between align-items-center">
+            <span>🔴 Signos Vitales en Tiempo Real</span>
+            <div class="d-flex align-items-center gap-2">
+              <span id="estado-conexion" class="text-warning">Conectando...</span>
+              <button class="btn btn-sm btn-danger" id="btn-monitor-inline" style="display:none" onclick="abrirMonitor()">📺 Ver Monitor</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row" id="contenedor-sensores-rt">
+              <div class="col-12 text-center text-muted" id="mensaje-espera-rt">Esperando transmisión de datos del equipo...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORIAL DE ALARMAS -->
+    <div class="row mt-4">
+      <div class="col-12">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <span class="fw-bold text-dark">🔔 Historial de Alarmas</span>
+            <div class="d-flex gap-2 align-items-center">
+              <select id="filtro-estado-alarma" class="form-select form-select-sm" style="width:auto;" onchange="cargarHistorialAlarmas()">
+                <option value="">Todas</option>
+                <option value="ACTIVA">Solo Activas</option>
+                <option value="RESUELTA">Solo Resueltas</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div id="tabla-alarmas-container">
+              <div class="text-center text-muted py-4">
+                <div class="spinner-border spinner-border-sm text-secondary me-2" role="status"></div>
+                Cargando historial...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalEdicion" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title">Editar Historia Clínica y Umbrales</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <form id="formEdicion">
+            <h6 class="text-primary border-bottom pb-1">👤 Datos Personales</h6>
+            <div class="row mb-3 mt-2">
+              <div class="col-md-4"><label for="p-nombre" class="form-label">Nombre</label><input type="text" class="form-control" id="p-nombre" required></div>
+              <div class="col-md-4"><label for="p-apellido" class="form-label">Apellido</label><input type="text" class="form-control" id="p-apellido" required></div>
+              <div class="col-md-4"><label for="p-dni" class="form-label">DNI</label><input type="text" class="form-control" id="p-dni" required></div>
+            </div>
+            <div class="row mb-3">
+              <div class="col-md-4"><label for="p-fecha-nac" class="form-label">Fecha de Nacimiento</label><input type="date" class="form-control" id="p-fecha-nac"></div>
+              <div class="col-md-4"><label for="p-sexo" class="form-label">Sexo</label><select class="form-select" id="p-sexo"><option value="M">Masculino</option><option value="F">Femenino</option></select></div>
+              <div class="col-md-4"><label for="p-direccion" class="form-label">Dirección</label><input type="text" class="form-control" id="p-direccion"></div>
+            </div>
+
+            <h6 class="text-primary border-bottom pb-1 mt-4">🏥 Información Clínica</h6>
+            <div class="row mb-3 mt-2">
+              <div class="col-md-5"><label for="p-tipo" class="form-label">Área</label><select class="form-select" id="p-tipo"><option value="Terapia Intensiva">UTI</option><option value="Guardia">Emergencias</option><option value="Sala Común">Piso</option></select></div>
+              <div class="col-md-7"><label for="p-diagnostico" class="form-label">Diagnóstico</label><input type="text" class="form-control" id="p-diagnostico"></div>
+            </div>
+
+            <h6 class="text-primary border-bottom pb-1 mt-4">⚙️ Umbrales Personalizados</h6>
+            <div class="row mb-2">
+                <div class="col-md-4 fw-bold">SpO2 % (Min/Max)</div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-spo2-min" placeholder="Mínimo"></div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-spo2-max" placeholder="Máximo"></div>
+            </div>
+            <div class="row mb-2">
+                <div class="col-md-4 fw-bold">Pulso Cardíaco BPM</div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-pulso-min" placeholder="Mínimo"></div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-pulso-max" placeholder="Máximo"></div>
+            </div>
+            <div class="row mb-2">
+                <div class="col-md-4 fw-bold">Temp. Piel (°C)</div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-temp-min" placeholder="Mínimo"></div>
+                <div class="col-md-4"><input type="number" step="0.1" class="form-control" id="u-temp-max" placeholder="Máximo"></div>
+            </div>
+            <div class="row mb-2">
+                <div class="col-md-4 fw-bold">P. Sistólica (mmHg)</div>
+                <div class="col-md-4"><input type="number" step="1" class="form-control" id="u-sistolica-min" placeholder="Mínimo"></div>
+                <div class="col-md-4"><input type="number" step="1" class="form-control" id="u-sistolica-max" placeholder="Máximo"></div>
+            </div>
+            <div class="row mb-4">
+                <div class="col-md-4 fw-bold">P. Diastólica (mmHg)</div>
+                <div class="col-md-4"><input type="number" step="1" class="form-control" id="u-diastolica-min" placeholder="Mínimo"></div>
+                <div class="col-md-4"><input type="number" step="1" class="form-control" id="u-diastolica-max" placeholder="Máximo"></div>
+            </div>
+
+            <button type="submit" class="btn btn-success w-100 py-2 mt-2 fw-bold" id="btnGuardar">Guardar Cambios</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const CONFIG = {
+      API_BASE: "http://localhost:8000",
+      WS_URL: "ws://localhost:8000/ws/datos"
+    };
+    const token = localStorage.getItem("token");
+    if (!token) window.location.replace("../login.html");
+
+    // Variables globales para guardar la info del paciente
+    let pacienteData = null;
+    let umbralesData = [];
+    const modalEdicion = new bootstrap.Modal(document.getElementById('modalEdicion'));
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUid = urlParams.get('uid');   // Desde panel (tiene dispositivo)
+    const targetId  = urlParams.get('id');    // Desde lista de pacientes
+    let uidActivo = targetUid || null; // UID del dispositivo activo — se setea en cargarPerfilPaciente
+
+    if (!targetUid && !targetId) {
+        alert("No se especificó ningún paciente o equipo.");
+        window.location.href = "panel.html";
+    }
+
+    document.getElementById("uid-equipo").innerText = targetUid || "Buscando...";
+
+    const btnEcg = document.getElementById("btn-monitor-ecg");
+
+    // 1. Traer info del paciente y sus umbrales
+    async function cargarPerfilPaciente() {
+      try {
+        let p;
+
+        if (targetUid) {
+            // Ruta por ?uid= (desde el panel)
+            const res = await fetch(`${CONFIG.API_BASE}/pacientes_por_dispositivo_uid/${targetUid}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                document.getElementById("nombre-paciente").innerText = "Equipo sin paciente asignado";
+                document.getElementById("datos-clinicos").innerHTML = "<p class='text-muted'>Este dispositivo está transmitiendo, pero no ha sido vinculado a ningún paciente.</p>";
+                document.getElementById("lista-umbrales").innerHTML = "<li class='list-group-item text-muted'>Utilizando umbrales globales del sistema.</li>";
+                document.getElementById("btn-editar-paciente").disabled = true;
+                return;
+            }
+            p = await res.json();
+uidActivo = targetUid;
+            document.getElementById("uid-equipo").innerText = targetUid;
+            btnEcg.disabled = false;
+            btnEcg.onclick = () => window.location.href = `monitorU1.html?uid=${targetUid}`;
+            document.getElementById("btn-monitor-inline").style.display = "";
+
+        } else {
+            // Ruta por ?id= (desde lista de pacientes)
+            const res = await fetch(`${CONFIG.API_BASE}/pacientes/${targetId}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                document.getElementById("nombre-paciente").innerText = "Paciente no encontrado";
+                document.getElementById("datos-clinicos").innerHTML = "<p class='text-muted'>No se pudo cargar el paciente.</p>";
+                return;
+            }
+            p = await res.json();
+
+            // Buscar si tiene dispositivo activo
+            try {
+                const resDisp = await fetch(`${CONFIG.API_BASE}/dispositivos/`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                const dispositivos = await resDisp.json();
+                const dispActivo = dispositivos.find(d => d.id_paciente === p.id_paciente);
+
+                if (dispActivo) {
+                    uidActivo = dispActivo.uid_equipo;
+                    document.getElementById("uid-equipo").innerText = dispActivo.uid_equipo;
+                    btnEcg.disabled = false;
+                    btnEcg.onclick = () => window.location.href = `monitorU1.html?uid=${dispActivo.uid_equipo}`;
+                    document.getElementById("btn-monitor-inline").style.display = "";
+                    conectarWebSocketLocal();
+                } else {
+                    document.getElementById("uid-equipo").innerText = "Sin dispositivo conectado";
+                    btnEcg.disabled = true;
+                    document.getElementById("contenedor-sensores-rt").innerHTML = `
+                        <div class="col-12 text-center py-5 text-muted">
+                            <div style="font-size:3rem">📵</div>
+                            <h5 class="mt-3">Sin dispositivo conectado</h5>
+                            <p class="mb-0">Este paciente no tiene ningún equipo de monitoreo asignado actualmente.</p>
+                        </div>`;
+                    document.getElementById("estado-conexion").innerText = "Sin señal ⚪";
+                }
+            } catch(e) {
+                document.getElementById("uid-equipo").innerText = "Sin dispositivo conectado";
+                btnEcg.disabled = true;
+            }
+        }
+
+        // --- A partir de acá, p siempre tiene datos válidos ---
+
+        pacienteData = p;
+        document.getElementById("btn-editar-paciente").disabled = false;
+
+        document.getElementById("nombre-paciente").innerText = `${p.nombre} ${p.apellido}`;
+        document.title = `${p.nombre} ${p.apellido} | Telemetría`;
+
+        const fechaIngreso = p.creado_en ? new Date(p.creado_en).toLocaleDateString() : 'No registrado';
+        document.getElementById("datos-clinicos").innerHTML = `
+          <p><strong>DNI:</strong> ${p.dni || 'No registrado'}</p>
+          <p><strong>Área:</strong> <span class="badge bg-info text-dark">${p.tipo || 'General'}</span></p>
+          <p><strong>Diagnóstico:</strong> ${p.diagnostico || 'No especificado'}</p>
+          <p><strong>Ingreso:</strong> ${fechaIngreso}</p>
+        `;
+
+        const resU = await fetch(`${CONFIG.API_BASE}/sensores/paciente/${p.id_paciente}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        umbralesData = await resU.json();
+
+        const listaU = document.getElementById("lista-umbrales");
+        if (umbralesData.length === 0) {
+            listaU.innerHTML = "<li class='list-group-item text-muted'>Utilizando umbrales globales por defecto.</li>";
+        } else {
+            listaU.innerHTML = "";
+            umbralesData.forEach(u => {
+                listaU.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="text-uppercase fw-bold">${u.tipo_signo.replace('_', ' ')}</span>
+                    <span class="badge bg-secondary rounded-pill">Min: ${u.valor_minimo} | Max: ${u.valor_maximo} ${u.unidad}</span>
+                </li>`;
+            });
+        }
+
+        // Cargar historial al final, cuando pacienteData ya está seteado
+        cargarHistorialAlarmas();
+
+      } catch (error) {
+        console.error("❌ Error al cargar perfil:", error);
+      }
+    }
+
+
+    // 2. Llenar y Abrir el Modal de Edición
+    function abrirModalEdicion() {
+        if (!pacienteData) return;
+
+        // Limpiamos formularios por las dudas
+        document.getElementById("formEdicion").reset();
+
+        // Llenar datos personales
+        document.getElementById("p-nombre").value = pacienteData.nombre || "";
+        document.getElementById("p-apellido").value = pacienteData.apellido || "";
+        document.getElementById("p-dni").value = pacienteData.dni || "";
+        document.getElementById("p-fecha-nac").value = pacienteData.fecha_nacimiento || "";
+        document.getElementById("p-sexo").value = pacienteData.sexo || "M";
+        document.getElementById("p-direccion").value = pacienteData.direccion || "";
+        document.getElementById("p-tipo").value = pacienteData.tipo || "Sala Común";
+        document.getElementById("p-diagnostico").value = pacienteData.diagnostico || "";
+
+        // Llenar umbrales si los hay
+        umbralesData.forEach(u => {
+            if(u.tipo_signo === 'spo2') {
+                document.getElementById("u-spo2-min").value = u.valor_minimo;
+                document.getElementById("u-spo2-max").value = u.valor_maximo;
+            } else if(u.tipo_signo === 'pulso') {
+                document.getElementById("u-pulso-min").value = u.valor_minimo;
+                document.getElementById("u-pulso-max").value = u.valor_maximo;
+            } else if(u.tipo_signo === 'temperatura') {
+                document.getElementById("u-temp-min").value = u.valor_minimo;
+                document.getElementById("u-temp-max").value = u.valor_maximo;
+            } else if(u.tipo_signo === 'sistolica') {
+                document.getElementById("u-sistolica-min").value = u.valor_minimo;
+                document.getElementById("u-sistolica-max").value = u.valor_maximo;
+            } else if(u.tipo_signo === 'diastolica') {
+                document.getElementById("u-diastolica-min").value = u.valor_minimo;
+                document.getElementById("u-diastolica-max").value = u.valor_maximo;
+            }
+        });
+
+        modalEdicion.show();
+    }
+
+    // 3. Guardar los cambios
+    document.getElementById("formEdicion").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        const btnGuardar = document.getElementById("btnGuardar");
+        btnGuardar.disabled = true;
+        btnGuardar.innerText = "Guardando...";
+
+        const payloadPaciente = {
+            nombre: document.getElementById("p-nombre").value,
+            apellido: document.getElementById("p-apellido").value,
+            dni: document.getElementById("p-dni").value,
+            fecha_nacimiento: document.getElementById("p-fecha-nac").value || null,
+            sexo: document.getElementById("p-sexo").value,
+            direccion: document.getElementById("p-direccion").value,
+            tipo: document.getElementById("p-tipo").value,
+            diagnostico: document.getElementById("p-diagnostico").value
+        };
+
+        try {
+            // A. Actualizamos datos del paciente (PATCH)
+            const resPac = await fetch(`${CONFIG.API_BASE}/pacientes/${pacienteData.id_paciente}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify(payloadPaciente)
+            });
+
+            if (!resPac.ok) throw new Error("Error al guardar datos del paciente.");
+
+            // B. Actualizamos los sensores
+            const uPayloads = [
+                { tipo: 'spo2', min: 'u-spo2-min', max: 'u-spo2-max', unit: '%' },
+                { tipo: 'pulso', min: 'u-pulso-min', max: 'u-pulso-max', unit: 'bpm' },
+                { tipo: 'temperatura', min: 'u-temp-min', max: 'u-temp-max', unit: '°C' },
+                { tipo: 'sistolica', min: 'u-sistolica-min', max: 'u-sistolica-max', unit: 'mmHg' },
+                { tipo: 'diastolica', min: 'u-diastolica-min', max: 'u-diastolica-max', unit: 'mmHg' }
+            ];
+
+            const promesasSensores = [];
+            for(const up of uPayloads) {
+                const vMin = document.getElementById(up.min).value;
+                const vMax = document.getElementById(up.max).value;
+                
+                if(vMin !== "" && vMax !== "") {
+                    promesasSensores.push(fetch(`${CONFIG.API_BASE}/sensores/`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                        body: JSON.stringify({ 
+                            id_paciente: pacienteData.id_paciente, 
+                            tipo_signo: up.tipo, 
+                            valor_minimo: parseFloat(vMin), 
+                            valor_maximo: parseFloat(vMax), 
+                            unidad: up.unit 
+                        })
+                    }));
+                }
+            }
+
+            if (promesasSensores.length > 0) await Promise.all(promesasSensores);
+
+            modalEdicion.hide();
+            cargarPerfilPaciente(); // Recargamos para que se vean los cambios en vivo
+
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            btnGuardar.disabled = false;
+            btnGuardar.innerText = "Guardar Cambios";
+        }
+    });
+
+    // 4. Conexión WebSocket — usa uidActivo (funciona tanto por ?uid= como por ?id=)
+    function conectarWebSocketLocal() {
+        if (!uidActivo) return; // No conectar si todavía no sabemos el uid
+        const ws = new WebSocket(CONFIG.WS_URL);
+        const estadoDiv = document.getElementById("estado-conexion");
+
+        ws.onopen = () => estadoDiv.innerText = "Conectado en vivo 🟢";
+        ws.onclose = () => {
+            estadoDiv.innerText = "Desconectado 🔴 Reintentando...";
+            setTimeout(conectarWebSocketLocal, 3000);
+        };
+
+        ws.onmessage = (event) => {
+            const rawData = JSON.parse(event.data);
+            const { sensor, payload } = rawData;
+
+            // Filtramos solo los mensajes del equipo de este paciente
+            if (payload.Uid_Equipo !== uidActivo) return;
+
+            document.getElementById("mensaje-espera-rt").style.display = "none";
+
+            if (sensor === "spo2") renderCajaSensor("spo2", "SpO₂", `${payload.value ?? "--"}`, "%", "text-primary");
+            else if (sensor === "pni") {
+                const val = payload.value ? payload.value.split("/") : ["--", "--"];
+                renderCajaSensor("pni", "Presión Arterial", `${val[0]}/${val[1]}`, "mmHg", "text-success");
+            }
+            else if (sensor === "temp" || sensor === "temperatura_piel") renderCajaSensor("temperatura", "Temp. de Piel", `${payload.value ?? "--"}`, "°C", "text-warning");
+            else if (sensor === "pulso" || sensor === "bpm") renderCajaSensor("pulso", "Frec. Cardíaca", `${payload.value ?? "--"}`, "bpm", "text-danger");
+            else if (sensor !== "ecg") renderCajaSensor(sensor, sensor.toUpperCase(), `${payload.value ?? "--"}`, "", "text-dark");
+        };
+    }
+
+    function renderCajaSensor(id, label, valor, unidad, colorClass) {
+        const contenedor = document.getElementById("contenedor-sensores-rt");
+        let caja = document.getElementById(`caja-${id}`);
+        
+        if (!caja) {
+            caja = document.createElement("div");
+            caja.className = "col-md-6";
+            caja.id = `caja-${id}`;
+            caja.innerHTML = `
+                <div class="sensor-box border border-2 border-light">
+                    <h6 class="text-muted text-uppercase mb-1">${label}</h6>
+                    <p class="sensor-val ${colorClass}" id="val-${id}">--</p>
+                    <small class="text-secondary">${unidad}</small>
+                </div>
+            `;
+            contenedor.appendChild(caja);
+        }
+        document.getElementById(`val-${id}`).innerText = valor;
+    }
+
+    // 5. Historial de Alarmas del Paciente
+    async function cargarHistorialAlarmas() {
+        if (!pacienteData) return; // Esperar a que cargue el paciente
+
+        const container = document.getElementById("tabla-alarmas-container");
+        const filtro = document.getElementById("filtro-estado-alarma").value;
+
+        container.innerHTML = `<div class="text-center text-muted py-4">
+            <div class="spinner-border spinner-border-sm text-secondary me-2" role="status"></div>
+            Cargando historial...
+        </div>`;
+
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/alertas/paciente/${pacienteData.id_paciente}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+
+            if (!res.ok) throw new Error("Error al obtener historial");
+            let alertas = await res.json();
+
+            // Filtrar por estado si hay filtro
+            if (filtro) alertas = alertas.filter(a => a.estado === filtro);
+
+            if (alertas.length === 0) {
+                container.innerHTML = `<p class="text-center text-muted py-4 mb-0">No hay alarmas registradas para este paciente.</p>`;
+                return;
+            }
+
+            let filas = "";
+            alertas.forEach(a => {
+                const fecha = a.fecha_hora ? new Date(a.fecha_hora).toLocaleString() : "—";
+                const resuelta = a.resuelta_en ? new Date(a.resuelta_en).toLocaleString() : "—";
+                const badge = a.estado === "ACTIVA"
+                    ? `<span class="badge bg-danger">ACTIVA</span>`
+                    : `<span class="badge bg-success">RESUELTA</span>`;
+                filas += `
+                    <tr>
+                        <td>${fecha}</td>
+                        <td>${a.descripcion}</td>
+                        <td>${badge}</td>
+                        <td class="text-muted">${a.estado === "RESUELTA" ? resuelta : "—"}</td>
+                    </tr>`;
+            });
+
+            container.innerHTML = `
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha y Hora</th>
+                            <th>Descripción</th>
+                            <th>Estado</th>
+                            <th>Resuelta en</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filas}</tbody>
+                </table>`;
+        } catch (error) {
+            container.innerHTML = `<p class="text-center text-danger py-3 mb-0">Error al cargar el historial de alarmas.</p>`;
+        }
+    }
+
+    function abrirMonitor() {
+        if (uidActivo) window.location.href = `monitorU1.html?uid=${uidActivo}`;
+    }
+
+    // WebSocket con uid dinámico (para cuando venimos por ?id= y encontramos el dispositivo)
+    function conectarWebSocketConUid(uid) {
+        const ws = new WebSocket(CONFIG.WS_URL);
+        const estadoDiv = document.getElementById("estado-conexion");
+        ws.onopen = () => estadoDiv.innerText = "Conectado en vivo 🟢";
+        ws.onclose = () => {
+            estadoDiv.innerText = "Desconectado 🔴 Reintentando...";
+            setTimeout(() => conectarWebSocketConUid(uid), 3000);
+        };
+        ws.onmessage = (event) => {
+            const rawData = JSON.parse(event.data);
+            const { sensor, payload } = rawData;
+            if (payload.Uid_Equipo !== uid) return;
+            document.getElementById("mensaje-espera-rt").style.display = "none";
+            if (sensor === "spo2") renderCajaSensor("spo2", "SpO₂", `${payload.value ?? "--"}`, "%", "text-primary");
+            else if (sensor === "pni") {
+                const val = payload.value ? payload.value.split("/") : ["--", "--"];
+                renderCajaSensor("pni", "Presión Arterial", `${val[0]}/${val[1]}`, "mmHg", "text-success");
+            }
+            else if (sensor === "temp" || sensor === "temperatura_piel") renderCajaSensor("temperatura", "Temp. de Piel", `${payload.value ?? "--"}`, "°C", "text-warning");
+            else if (sensor === "pulso" || sensor === "bpm") renderCajaSensor("pulso", "Frec. Cardíaca", `${payload.value ?? "--"}`, "bpm", "text-danger");
+            else if (sensor !== "ecg") renderCajaSensor(sensor, sensor.toUpperCase(), `${payload.value ?? "--"}`, "", "text-dark");
+        };
+    }
+
+    function cerrarSesion() {
+      localStorage.clear();
+      window.location.replace("../login.html");
+    }
+
+    // Iniciar: cargarPerfilPaciente setea uidActivo y luego llama conectarWebSocketLocal()
+    // Si venimos por ?uid=, también lo iniciamos directamente al cargar
+    cargarPerfilPaciente();
+    if (targetUid) conectarWebSocketLocal();
+  </script>
+</body>
+</html>

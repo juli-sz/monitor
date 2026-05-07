@@ -7,15 +7,16 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body { background-color: #f8f9fa; }
-    #sidebar { height: 100vh; position: fixed; width: 220px; }
+    #sidebar { height: 100vh; position: fixed; width: 220px; top: 0; left: 0; z-index: 1000;}
     .main-content { margin-left: 220px; padding: 20px; }
-    .alerta-activa { border-left: 5px solid #dc3545; background-color: #fff3f3; }
-    .alerta-resuelta { border-left: 5px solid #198754; opacity: 0.7; }
+    .card-alarma { border-left: 5px solid #dc3545; transition: transform 0.2s; }
+    .card-alarma:hover { transform: scale(1.01); }
+    .alerta-item { border-bottom: 1px solid #eee; padding: 8px 0; }
+    .alerta-item:last-child { border-bottom: none; }
   </style>
 </head>
 <body>
 
-  <!-- Barra Lateral -->
   <nav id="sidebar" class="bg-dark text-white p-3">
     <h4 class="mb-4 text-center">🩺 Telemetría</h4>
     <ul class="nav flex-column">
@@ -30,97 +31,169 @@
     </div>
   </nav>
 
-  <!-- Contenido Principal -->
   <div class="main-content">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h3>Historial de Alarmas</h3>
-      <button class="btn btn-primary" onclick="cargarAlarmas()">🔄 Actualizar</button>
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+      <div>
+        <h2 class="m-0 text-danger fw-bold">🚨 Central de Alarmas Activas</h2>
+        <p class="text-muted m-0">Monitoreo crítico en tiempo real agrupado por paciente.</p>
+      </div>
+      <button class="btn btn-outline-secondary" onclick="cargarAlarmas()">🔄 Actualizar Manualmente</button>
     </div>
 
-    <div class="row" id="contenedor-alarmas">
-      <!-- Las alertas se inyectarán aquí -->
+    <div id="contenedor-alarmas" class="row">
+      <div class="col-12 text-center text-muted mt-5">
+        <div class="spinner-border text-danger mb-3" role="status"></div>
+        <h5>Buscando alarmas activas...</h5>
+      </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    const API_URL = "http://localhost:8000/alertas"; // Asumiendo este endpoint[cite: 2]
+    const API_BASE = "http://localhost:8000";
     const token = localStorage.getItem("token");
-    const userRole = localStorage.getItem("userRole");
-
     if (!token) window.location.replace("../login.html");
 
-    // Función 1: Traer las alarmas reales de la base de datos
-    async function cargarAlarmas() {
-      const contenedor = document.getElementById("contenedor-alarmas");
-      contenedor.innerHTML = '<div class="col-12 text-center"><div class="spinner-border text-primary" role="status"></div></div>';
-
-      try {
-        const res = await fetch(API_URL, {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-        
-        if (!res.ok) throw new Error("Error al cargar las alarmas");
-        
-        const alarmas = await res.json();
-        contenedor.innerHTML = "";
-
-        if (alarmas.length === 0) {
-          contenedor.innerHTML = `<div class="col-12"><p class="text-muted">No hay alarmas registradas.</p></div>`;
-          return;
-        }
-
-        alarmas.forEach(a => {
-          const esActiva = a.estado === "ACTIVA";
-          const claseCard = esActiva ? "alerta-activa" : "alerta-resuelta";
-          const badge = esActiva ? `<span class="badge bg-danger">ACTIVA</span>` : `<span class="badge bg-success">RESUELTA</span>`;
-          
-          // El botón para resolver alarma solo se muestra si está activa y si el rol lo permite
-          const btnResolver = (esActiva && userRole === "admin") ? 
-            `<button class="btn btn-sm btn-danger mt-2" onclick="resolverAlarma(${a.id})">Marcar como Resuelta</button>` : '';
-
-          contenedor.innerHTML += `
-            <div class="col-md-6 mb-3">
-              <div class="card shadow-sm ${claseCard}">
-                <div class="card-body">
-                  <div class="d-flex justify-content-between">
-                    <h5 class="card-title text-dark">Alarma: ${a.sensor}</h5>
-                    ${badge}
-                  </div>
-                  <p class="mb-1"><strong>Paciente:</strong> ${a.paciente}</p>
-                  <p class="mb-1"><strong>Valor detectado:</strong> <span class="text-danger fw-bold">${a.valor}</span></p>
-                  <p class="text-muted small mb-0">Hora: ${a.fecha}</p>
-                  ${btnResolver}
-                </div>
-              </div>
-            </div>
-          `;
-        });
-      } catch (error) {
-          console.error(error);
-          contenedor.innerHTML = `<div class="col-12"><p class="text-danger">Hubo un problema de conexión con el servidor.</p></div>`;
-      }
+    // Función para buscar el nombre del paciente
+    async function obtenerDatosPaciente(id_paciente) {
+        if (!id_paciente) return { nombre: "Paciente No Asignado", area: "Desconocida" };
+        try {
+            const res = await fetch(`${API_BASE}/pacientes/${id_paciente}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const p = await res.json();
+                return { nombre: `${p.nombre} ${p.apellido}`, area: p.tipo || 'Sala Común' };
+            }
+        } catch (e) { console.error("Error buscando paciente:", e); }
+        return { nombre: "Error al cargar paciente", area: "---" };
     }
 
-    // Función 2: Ejecutar el PATCH real en el backend
-    async function resolverAlarma(id) {
-      if (!confirm("¿Confirmas que esta situación médica fue atendida?")) return;
-      
-      try {
-          const res = await fetch(`${API_URL}/${id}/resolver`, { 
-              method: "PATCH", 
-              headers: { "Authorization": `Bearer ${token}` } 
-          });
-          
-          if (res.ok) {
-              cargarAlarmas(); // Recargamos la lista automáticamente
-          } else {
-              alert("Error al intentar resolver la alarma.");
-          }
-      } catch (error) {
-          console.error(error);
-          alert("Error de conexión al resolver la alarma.");
-      }
+    async function cargarAlarmas() {
+        const contenedor = document.getElementById("contenedor-alarmas");
+        
+        try {
+            // 1. Buscamos TODAS las alarmas con estado ACTIVA
+            const resAlertas = await fetch(`${API_BASE}/alertas/?estado=ACTIVA`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            
+            if (!resAlertas.ok) throw new Error("Error en el servidor");
+            const alertas = await resAlertas.json();
+
+            if (alertas.length === 0) {
+                contenedor.innerHTML = `
+                  <div class="col-12 text-center mt-5">
+                    <h1 style="font-size: 4rem;">✅</h1>
+                    <h3 class="text-success mt-3">Todo bajo control</h3>
+                    <p class="text-muted">No hay alarmas activas en este momento.</p>
+                  </div>`;
+                return;
+            }
+
+            // 2. AGRUPAR Y FILTRAR DUPLICADOS
+            const agrupadas = {};
+            
+            alertas.forEach(alerta => {
+                const claveGrupo = alerta.id_paciente ? `pac-${alerta.id_paciente}` : `disp-${alerta.id_dispositivo}`;
+                
+                if (!agrupadas[claveGrupo]) {
+                    agrupadas[claveGrupo] = {
+                        id_paciente: alerta.id_paciente,
+                        id_dispositivo: alerta.id_dispositivo,
+                        // Usamos un objeto para guardar solo UNA alarma por tipo/descripción
+                        alarmasUnicas: {} 
+                    };
+                }
+
+                // Extraemos el tipo de sensor de la descripción.
+                // El formato es "Alarma de SENSOR: Valor detectado X", tomamos solo "SENSOR".
+                // Como las alertas vienen de más nuevas a más viejas, la primera que leemos es la más reciente.
+                const matchSensor = alerta.descripcion.match(/Alarma de (.+?):/i);
+                const tipoSensor = matchSensor ? matchSensor[1].trim() : alerta.descripcion;
+
+                // Si aún no registramos este sensor para este paciente, lo guardamos (es el más reciente)
+                if (!agrupadas[claveGrupo].alarmasUnicas[tipoSensor]) {
+                    agrupadas[claveGrupo].alarmasUnicas[tipoSensor] = alerta;
+                }
+            });
+
+            // 3. RENDERIZAR LAS CARDS
+            contenedor.innerHTML = ""; 
+
+            for (const clave in agrupadas) {
+                const grupo = agrupadas[clave];
+                const paciente = await obtenerDatosPaciente(grupo.id_paciente);
+                
+                // Convertimos el objeto de alarmas únicas nuevamente en un array
+                const listaFiltrada = Object.values(grupo.alarmasUnicas);
+                
+                let listaHTML = "";
+                listaFiltrada.forEach(a => {
+                    const hora = new Date(a.fecha_hora).toLocaleTimeString();
+                    listaHTML += `
+                        <div class="alerta-item d-flex justify-content-between align-items-center">
+                            <span class="text-dark fw-bold">🔹 ${a.descripcion}</span>
+                            <span class="badge bg-secondary">${hora}</span>
+                        </div>
+                    `;
+                });
+
+                contenedor.innerHTML += `
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow-sm card-alarma h-100">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center border-bottom-0 pb-0">
+                                <div>
+                                    <h5 class="text-danger fw-bold mb-0">${paciente.nombre}</h5>
+                                    <small class="text-muted">Ubicación: ${paciente.area}</small>
+                                </div>
+                                <span class="badge bg-danger rounded-pill fs-6">${listaFiltrada.length} Sensores Críticos</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="bg-light p-3 rounded mb-3">
+                                    ${listaHTML}
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <button class="btn btn-outline-primary" onclick="verPaciente(${grupo.id_paciente})">Ver Monitor en Vivo</button>
+                                    <button class="btn btn-success fw-bold" onclick="atenderAlarmas(${grupo.id_paciente})">✓ Marcar como Atendido</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+        } catch (error) {
+            contenedor.innerHTML = `<div class="col-12 text-center text-danger"><h5>Error de conexión con el servidor.</h5></div>`;
+        }
+    }
+    // Funciones de los botones
+    async function atenderAlarmas(id_paciente) {
+        if (!id_paciente) {
+            alert("Alarma de dispositivo sin paciente. Diríjase a la cama manualmente.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/alertas/resolver/paciente/${id_paciente}`, {
+                method: "PATCH",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+                cargarAlarmas(); // Refrescamos la pantalla
+            }
+        } catch (error) {
+            alert("Error al resolver las alarmas.");
+        }
+    }
+
+    // Para saltar directo al monitor de ese paciente
+    function verPaciente(id_paciente) {
+        if(!id_paciente) return;
+        // Buscamos el UID del equipo asociado a este paciente (lógica simplificada, asume que sabés el UID o redirigís al panel)
+        window.location.href = `panel.html`; 
+        // Idealmente, si tenés el UID del dispositivo, harías: window.location.href = `detalle.html?uid=${uid}`
     }
 
     function cerrarSesion() {
@@ -128,8 +201,9 @@
       window.location.replace("../login.html");
     }
 
-    // Carga inicial
+    // Cargar al inicio y refrescar cada 5 segundos automáticamente
     cargarAlarmas();
+    setInterval(cargarAlarmas, 5000); 
   </script>
 </body>
 </html>

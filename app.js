@@ -34,10 +34,12 @@ let alarmasActivas = {};
 const toggleButton = document.getElementById("menu-toggle");
 const sidebar = document.getElementById("sidebar");
 
-toggleButton.addEventListener("click", () => {
-  sidebar.classList.toggle("hidden");
-  document.body.style.marginLeft = sidebar.classList.contains("hidden") ? "0" : "220px";
-});
+if (toggleButton && sidebar) {
+    toggleButton.addEventListener("click", () => {
+      sidebar.classList.toggle("hidden");
+      document.body.style.marginLeft = sidebar.classList.contains("hidden") ? "0" : "220px";
+    });
+}
 
 // ==========================================
 // FUNCIONES DE DATOS (API REST)
@@ -118,25 +120,24 @@ function evaluarUmbral(uid, sensor, valorNumerico, valorTexto) {
 async function verificarAlertas(uid, id_paciente) {
   const ahora = Date.now();
   if (ultimasAlertasCheck[uid] && (ahora - ultimasAlertasCheck[uid] < CONFIG.INTERVALO_ALERTAS_MS)) {
-    return; 
+    return;
   }
   ultimasAlertasCheck[uid] = ahora;
 
   try {
-    await fetch(`${CONFIG.API_BASE_URL}/alertas/resolver_si_corresponde/${id_paciente}`, { 
-      method: "POST",
+    // Usamos el endpoint correcto: /alertas/?estado=ACTIVA y filtramos por paciente en el cliente
+    const res = await fetch(`${CONFIG.API_BASE_URL}/alertas/?estado=ACTIVA`, {
       headers: { "Authorization": `Bearer ${token}` }
     });
 
-    const res = await fetch(`${CONFIG.API_BASE_URL}/alertas/${id_paciente}?estado=ACTIVA`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    
+    if (!res.ok) return;
+
     const alertas = await res.json();
     const card = document.getElementById(`card-${uid}`);
     if (!card) return;
 
-    if (alertas && alertas.length > 0) {
+    const tieneActivas = alertas.some(a => a.id_paciente === id_paciente);
+    if (tieneActivas) {
       card.classList.add("alerta-activa");
     } else {
       card.classList.remove("alerta-activa");
@@ -147,13 +148,8 @@ async function verificarAlertas(uid, id_paciente) {
 }
 
 // ==========================================
-// FUNCIONES DE RENDERIZADO (DOM)
+// FUNCIONES DE RENDERIZADO (DOM DINÁMICO)
 // ==========================================
-function actualizarCampo(uid, campo, valor) {
-  const el = document.getElementById(`${campo}-${uid}`);
-  if (el) el.textContent = valor;
-}
-
 function actualizarTituloTarjeta(uid, nombrePaciente) {
   const titulo = document.getElementById(`titulo-paciente-${uid}`);
   if (titulo && titulo.textContent !== nombrePaciente) {
@@ -161,45 +157,53 @@ function actualizarTituloTarjeta(uid, nombrePaciente) {
   }
 }
 
+// Crea la estructura vacía de la tarjeta
 function crearTarjetaPaciente(uid, nombrePaciente) {
   const contenedor = document.getElementById("contenedor-pacientes");
+  if (!contenedor) return;
+  
   const col = document.createElement("div");
-  col.className = "col-md-4";
+  col.className = "col-md-4 mb-4";
   
   col.innerHTML = `
-    <div class="card sensor-card" id="card-${uid}">
-      <div class="card-body">
-        <h5 class="card-title text-center" id="titulo-paciente-${uid}">${nombrePaciente}</h5>
+    <div class="card sensor-card h-100" id="card-${uid}">
+      <div class="card-body d-flex flex-column">
+        <h5 class="card-title text-center fw-bold text-truncate" id="titulo-paciente-${uid}">${nombrePaciente}</h5>
         
-        <p class="label">SpO₂</p>
-        <p id="spo2-${uid}" class="sensor-value text-primary">-- %</p>
-        
-        <p class="label">Pulso</p>
-        <p id="pulso-${uid}" class="sensor-value text-danger">-- bpm</p>
-        
-        <p class="label">Presión Arterial</p>
-        <p id="pni-${uid}" class="sensor-value text-success">-- / -- mmHg</p>
-        
-        <p class="label">Temp. de Piel</p>
-        <p id="temperatura-${uid}" class="sensor-value text-warning">-- °C</p>
+        <div id="sensores-container-${uid}" class="mt-3 flex-grow-1"></div>
         
         <hr>
-        <small class="text-muted" id="last-update-${uid}">Esperando datos...</small>
+        <small class="text-muted d-block text-center mb-3" id="last-update-${uid}">Esperando datos...</small>
         
-        <button class="btn btn-info btn-sm mt-3 w-100" data-uid="${uid}">
-          Abrir en uPlot
+        <button class="btn btn-primary w-100 fw-bold mt-auto" onclick="window.location.href='detalle.html?uid=${uid}'">
+          Ver Perfil Completo
         </button>
       </div>
     </div>`;
     
   contenedor.appendChild(col);
+}
 
-  const consultarBtn = col.querySelector(`button[data-uid="${uid}"]`);
-  if (consultarBtn) {
-    consultarBtn.addEventListener("click", () => {
-      window.location.href = `monitorU1.html?uid=${uid}`;
-    });
-  }
+// Agrega o actualiza un sensor específico dentro de la tarjeta
+function actualizarSensorDinamico(uid, idSensor, label, valor, colorClass = "text-dark") {
+    const container = document.getElementById(`sensores-container-${uid}`);
+    if (!container) return;
+
+    let elementoValor = document.getElementById(`${idSensor}-${uid}`);
+    
+    // Si el sensor no existe en la UI, lo agregamos
+    if (!elementoValor) {
+        const div = document.createElement("div");
+        div.className = "mb-2";
+        div.innerHTML = `
+            <p class="label mb-0 text-muted small fw-bold">${label}</p>
+            <p id="${idSensor}-${uid}" class="sensor-value ${colorClass} mb-0" style="font-size: 1.4em;">${valor}</p>
+        `;
+        container.appendChild(div);
+    } else {
+        // Si ya existe, solo le cambiamos el texto
+        elementoValor.textContent = valor;
+    }
 }
 
 // ==========================================
@@ -242,38 +246,44 @@ function conectarWebSocket() {
       }
 
       // ==========================================
-      // PARSEAR Y EVALUAR SENSORES
+      // PARSEAR Y EVALUAR SENSORES (DINÁMICO)
       // ==========================================
       if (sensor === "spo2") {
-        actualizarCampo(uid, "spo2", `${payload.value ?? "--"} %`);
+        actualizarSensorDinamico(uid, "spo2", "Saturación (SpO₂)", `${payload.value ?? "--"} %`, "text-primary");
         if (payload.value !== undefined) {
             evaluarUmbral(uid, "spo2", parseFloat(payload.value), `${payload.value}%`);
         }
 
         if (payload.pulso || payload.Pr) {
           const pulso = payload.pulso || payload.Pr;
-          actualizarCampo(uid, "pulso", `${pulso} bpm`);
+          actualizarSensorDinamico(uid, "pulso", "Frecuencia Cardíaca", `${pulso} bpm`, "text-danger");
           evaluarUmbral(uid, "pulso", parseFloat(pulso), `${pulso} bpm`);
         }
       } 
       else if (sensor === "pni") {
         const val = payload.value ? payload.value.split("/") : ["--", "--"];
-        actualizarCampo(uid, "pni", `${val[0]}/${val[1]} mmHg`);
+        actualizarSensorDinamico(uid, "pni", "Presión Arterial", `${val[0]}/${val[1]} mmHg`, "text-success");
       } 
       else if (sensor === "temp" || sensor === "temperatura_piel") {
-        actualizarCampo(uid, "temperatura", `${payload.value ?? "--"} °C`);
+        actualizarSensorDinamico(uid, "temperatura", "Temp. de Piel", `${payload.value ?? "--"} °C`, "text-warning");
         if (payload.value !== undefined) {
-            // Enviamos "temperatura" para que coincida con la BD
             evaluarUmbral(uid, "temperatura", parseFloat(payload.value), `${payload.value} °C`);
         }
       } 
       else if ((sensor === "pulso" || sensor === "bpm") && payload.value !== undefined) {
-        actualizarCampo(uid, "pulso", `${payload.value} bpm`);
-        // AGREGADO: Evaluar el pulso cuando llega solo
+        actualizarSensorDinamico(uid, "pulso", "Frecuencia Cardíaca", `${payload.value} bpm`, "text-danger");
         evaluarUmbral(uid, "pulso", parseFloat(payload.value), `${payload.value} bpm`);
       }
+      // SI LLEGA UN SENSOR NUEVO QUE NO PROGRAMAMOS ARRIBA, LO DIBUJA IGUAL:
+      else if (sensor !== "ecg") { 
+        actualizarSensorDinamico(uid, sensor, sensor.toUpperCase(), `${payload.value ?? '--'}`, "text-info");
+      }
 
-      actualizarCampo(uid, "last-update", `Actualizado: ${timestamp}`);
+      // Actualizamos la hora de última lectura
+      const lastUpdateEl = document.getElementById(`last-update-${uid}`);
+      if(lastUpdateEl) {
+        lastUpdateEl.textContent = `Actualizado: ${timestamp}`;
+      }
 
       try {
         const resPaciente = await fetch(`${CONFIG.API_BASE_URL}/pacientes_por_dispositivo_uid/${uid}`, {

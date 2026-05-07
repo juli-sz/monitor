@@ -69,32 +69,29 @@ app.include_router(ws_router)
 # ENDPOINTS
 # ======================================================
 
-@app.get("/pacientes_por_dispositivo_uid/{uid_equipo}") # O @router.get si usás routers
+@app.get("/pacientes_por_dispositivo_uid/{uid_equipo}")
 def obtener_paciente_por_uid(uid_equipo: str, db: Session = Depends(get_db)):
-    # 1. Buscamos el dispositivo por su UID
-    dispositivo = db.query(Dispositivo).filter(Dispositivo.uid_equipo == uid_equipo).first()
-    
-    if not dispositivo:
+    # 1. Buscamos el dispositivo
+    disp = db.query(Dispositivo).filter(Dispositivo.uid_equipo == uid_equipo).first()
+    if not disp:
         raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
-        
-    # 2. Buscamos la asociación ACTIVA en la tabla intermedia
+    
+    # 2. Buscamos la asociación activa (fecha de disociación es nula)
     asoc_activa = db.query(PacienteDispositivo).filter(
-        PacienteDispositivo.id_dispositivo == dispositivo.id_dispositivo,
+        PacienteDispositivo.id_dispositivo == disp.id_dispositivo,
         PacienteDispositivo.fecha_hora_disoc == None
     ).first()
+    
+    if not asoc_activa:
+        raise HTTPException(status_code=404, detail="No hay paciente asociado a este equipo")
 
-    # Si no hay asociación activa, tiramos 404 para que el frontend ponga "(Sin Asociar)"
-    if not asoc_activa or not asoc_activa.paciente:
-        raise HTTPException(status_code=404, detail="Dispositivo sin paciente asignado")
+    # 3. BUSCAMOS AL PACIENTE MANUALMENTE (Esto soluciona el AttributeError)
+    paciente = db.query(Paciente).filter(Paciente.id_paciente == asoc_activa.id_paciente).first()
+    
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado en la base de datos")
         
-    # 3. Si todo está bien, devolvemos los datos del paciente para la tarjeta
-    return {
-        "id_paciente": asoc_activa.paciente.id_paciente,
-        "nombre": asoc_activa.paciente.nombre,
-        "apellido": asoc_activa.paciente.apellido,
-        "dni": asoc_activa.paciente.dni
-    }
-
+    return paciente
 
 @app.get("/")
 async def root():

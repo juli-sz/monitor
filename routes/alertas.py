@@ -3,77 +3,106 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func  # <-- Importamos func para la hora
 from database import get_db
 from models import Alerta, Dispositivo, PacienteDispositivo
-from pydantic import BaseModel
+from schemas.alerta import AlertaCreate
+from typing import Optional
 
 router = APIRouter(prefix="/alertas", tags=["Alertas"])
-
-class AlertaCreate(BaseModel):
-    uid_equipo: str
-    sensor: str
-    valor: str
     
-# POST: Registrar nueva alarma desde el monitor
+# ======================================================
+# POST: Registrar nueva alarma desde el monitor (MQTT)
+# ======================================================
 @router.post("/")
 def registrar_alerta(alerta_in: AlertaCreate, db: Session = Depends(get_db)):
     disp = db.query(Dispositivo).filter(Dispositivo.uid_equipo == alerta_in.uid_equipo).first()
     if not disp:
         return {"error": "Equipo no encontrado"}
 
-    asoc = db.query(PacienteDispositivo).filter_by(
-        id_dispositivo=disp.id_dispositivo, 
-        fecha_hora_disoc=None
+    # Buscamos si alguien está conectado a ese equipo AHORA MISMO
+    asoc_activa = db.query(PacienteDispositivo).filter(
+        PacienteDispositivo.id_dispositivo == disp.id_dispositivo,
+        PacienteDispositivo.fecha_hora_disoc == None
     ).first()
+    
+    # Extraemos el ID del paciente (si es que hay uno conectado)
+    id_paciente_actual = asoc_activa.id_paciente if asoc_activa else None
 
     nueva_alerta = Alerta(
         id_dispositivo=disp.id_dispositivo,
-        id_paciente=asoc.id_paciente if asoc else None,
+        id_paciente=id_paciente_actual,
         descripcion=f"Alarma de {alerta_in.sensor.upper()}: Valor detectado {alerta_in.valor}",
         estado="ACTIVA"
     )
+    
     db.add(nueva_alerta)
     db.commit()
+    
     return {"mensaje": "Alerta registrada"}
+
 # ======================================================
-# GET: Obtener el historial de alarmas
+# GET: Obtener todas las alertas (con filtro opcional por estado)
 # ======================================================
 @router.get("/")
-def listar_alertas(db: Session = Depends(get_db)):
-    # Traemos las últimas 50 alarmas, ordenadas por la fecha_hora
-    alertas_db = db.query(Alerta).order_by(Alerta.fecha_hora.desc()).limit(50).all()
+def obtener_todas_las_alertas(estado: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(Alerta)
     
+    if estado:
+        query = query.filter(Alerta.estado == estado)
+        
+    # Las ordenamos de más recientes a más antiguas
+    alertas_db = query.order_by(Alerta.fecha_hora.desc()).all()
+    
+    # Devolvemos los datos en un formato diccionario limpio que el frontend pueda leer bien
     resultado = []
     for a in alertas_db:
-        # Buscamos el nombre del paciente asociado (si lo hay)
-        paciente_nombre = "Desconocido"
-        if a.paciente_rel:
-            paciente_nombre = f"{a.paciente_rel.nombre} {a.paciente_rel.apellido}"
-            
         resultado.append({
-            "id": a.id_alerta,
-            "paciente": paciente_nombre,
-            # Como la info está junta en 'descripcion', la acomodamos así para el frontend:
-            "sensor": "Sistema", 
-            "valor": a.descripcion, 
+            "id_alerta": a.id_alerta,
+            "id_dispositivo": a.id_dispositivo,
+            "id_paciente": a.id_paciente,
+            "descripcion": a.descripcion,
             "estado": a.estado,
-            "fecha": a.fecha_hora.strftime("%H:%M:%S - %d/%m/%Y") if a.fecha_hora else "Sin fecha"
+            "fecha_hora": a.fecha_hora.isoformat() if a.fecha_hora else None
         })
         
     return resultado
 
+
 # ======================================================
-# PATCH: Marcar una alarma como RESUELTA
+# PATCH: Resolver todas las alarmas de un paciente manualmente
 # ======================================================
-@router.patch("/{id_alerta}/resolver")
-def resolver_alarma(id_alerta: int, db: Session = Depends(get_db)):
-    alarma = db.query(Alerta).filter(Alerta.id_alerta == id_alerta).first()
+# Buscá esta función en routes/alertas.py y dejala así:
+
+@router.patch("/resolver/paciente/{id_paciente}")
+def resolver_alarmas_paciente(id_paciente: int, db: Session = Depends(get_db)):
+    alertas = db.query(Alerta).filter(
+        Alerta.id_paciente == id_paciente, 
+        Alerta.estado == "ACTIVA"
+    ).all()
     
-    if not alarma:
-        raise HTTPException(status_code=404, detail="Alarma no encontrada")
+    for a in alertas:
+        a.estado = "RESUELTA"
+        a.resuelta_en = func.now()
         
-    # Actualizamos el estado y marcamos la hora exacta en que se resolvió
-    alarma.estado = "RESUELTA"
-    alarma.resuelta_en = func.now() 
-    
     db.commit()
-    
-    return {"mensaje": "Alarma marcada como resuelta"}
+    return {"mensaje": f"{len(alertas)} alarmas resueltas"}
+# ======================================================
+# GET: Obtener historial de alertas de un paciente
+# ======================================================
+@router.get("/paciente/{id_paciente}")
+def obtener_alertas_paciente(id_paciente: int, db: Session = Depends(get_db)):
+    alertas_db = db.query(Alerta).filter(
+        Alerta.id_paciente == id_paciente
+    ).order_by(Alerta.fecha_hora.desc()).all()
+
+    resultado = []
+    for a in alertas_db:
+        resultado.append({
+            "id_alerta": a.id_alerta,
+            "id_dispositivo": a.id_dispositivo,
+            "id_paciente": a.id_paciente,
+            "descripcion": a.descripcion,
+            "estado": a.estado,
+            "fecha_hora": a.fecha_hora.isoformat() if a.fecha_hora else None,
+            "resuelta_en": a.resuelta_en.isoformat() if a.resuelta_en else None
+        })
+
+    return resultado

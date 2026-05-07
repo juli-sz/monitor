@@ -1,11 +1,11 @@
-# schemas/usuario.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 class UsuarioCrear(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=6)
     nombre: str
-    rol: str = Field(..., pattern="^(admin|medico|enfermero|visor)$")
+    email: EmailStr
+    password: str
+    rol: str
 
 class UsuarioLogin(BaseModel):
     email: EmailStr
@@ -15,4 +15,13 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     rol: str
+
+class UsuarioResponse(BaseModel):
+    id_usuario: int
     nombre: str
+    email: str
+    rol: str
+    activo: bool
+
+    class Config:
+        from_attributes = True

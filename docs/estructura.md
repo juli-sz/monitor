@@ -181,4 +181,3 @@ Este documento contiene la documentación completa de la arquitectura del sistem
 │
 [admin/alarmas.html] ────────┴─► (Click Badge) ──► [admin/detalle.html?id={id_paciente}]
 
-💡 Tips extras

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MER - Sistema de Telemetría</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-color: #f3f4f6;
+      --card-bg: #ffffff;
+      --text-main: #000000; /* Texto principal en negro puro */
+      --text-muted: #4b5563;
+      --border-color: #d1d5db;
+      --accent: #3b82f6;
+      --grid-dot: #9ca3af;
+    }
+
+    body {
+      margin: 0;
+      padding: 2vh 2vw;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      height: 96vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    .dashboard-card {
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      border: 1px solid var(--border-color);
+      width: 100%;
+      max-width: 1400px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--card-bg);
+      z-index: 10;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #000000;
+    }
+
+    .badge {
+      background-color: var(--accent);
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    #erd-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background-color: var(--bg-color);
+      background-image: radial-gradient(var(--grid-dot) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+
+    #erd {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #erd svg {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: none !important;
+      cursor: grab;
+    }
+
+    #erd svg:active {
+      cursor: grabbing;
+    }
+
+    /* FORZAR TEXTO NEGRO EN EL DIAGRAMA */
+    #erd svg text {
+      fill: #000000 !important;
+      font-weight: 500 !important;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      gap: 8px;
+      background: var(--card-bg);
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+
+    .controls button {
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      cursor: pointer;
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .controls button:hover {
+      background: #e5e7eb;
+      color: var(--accent);
+    }
+  </style>
+  
+  <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+</head>
+<body>
+
+  <div class="dashboard-card">
+    <header>
+      <div>
+        <h1>Modelo Entidad-Relación</h1>
+        <p style="margin: 4px 0 0 0; font-size: 0.875rem; color: var(--text-muted);">Sistema de Telemetría Hospitalaria</p>
+      </div>
+      <div>
+        <span class="badge">Interactivo</span>
+      </div>
+    </header>
+    
+    <div id="erd-container">
+      <div id="erd"></div>
+      
+      <div class="controls">
+        <button id="zoom-in" title="Acercar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="zoom-out" title="Alejar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="zoom-reset" title="Centrar diagrama">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+    
+    await document.fonts.ready;
+    
+    // Configuración forzada para alto contraste (blanco y negro puro)
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      fontFamily: '"Inter", sans-serif',
+      er: {
+        fontSize: 14,
+        layoutDirection: 'TB',
+        minEntityWidth: 160,
+        entityPadding: 16,
+      },
+      themeVariables: {
+        fontFamily: '"Inter", sans-serif',
+        primaryColor: '#ffffff', // Fondo de las tablas blanco
+        primaryBorderColor: '#000000', // Bordes de tablas negros
+        lineColor: '#000000', // Líneas de relación negras
+        textColor: '#000000', // Texto negro
+        mainBkg: '#ffffff',
+      }
+    });
+
+    const diagram = `erDiagram
+      USUARIO {
+        int id_usuario PK
+        string email
+        string password_hash
+        string nombre
+        string rol
+        bool activo
+        timestamp creado_en
+      }
+
+      PACIENTE {
+        int id_paciente PK
+        string nombre
+        string apellido
+        string dni
+        date fecha_nacimiento
+        string sexo
+        string tipo
+        text diagnostico
+        date fecha_egreso
+        timestamp creado_en
+      }
+
+      DISPOSITIVO {
+        int id_dispositivo PK
+        string uid_equipo
+        string estado
+        timestamp creado_en
+      }
+
+      PACIENTE_DISPOSITIVO {
+        int id PK
+        int id_paciente FK
+        int id_dispositivo FK
+        timestamp fecha_hora_asoc
+        timestamp fecha_hora_disoc
+      }
+
+      ALERTA {
+        int id_alerta PK
+        int id_dispositivo FK
+        int id_paciente FK
+        string descripcion
+        string estado
+        timestamp fecha_hora
+        timestamp resuelta_en
+      }
+
+      RANGO_SIGNO_VITAL {
+        int id_rango PK
+        int id_paciente FK
+        string tipo_signo
+        numeric valor_minimo
+        numeric valor_maximo
+        string unidad
+      }
+
+      SENSOR {
+        int id_sensor PK
+        int id_dispositivo FK
+        string tipo
+        string estado
+        timestamp creado_en
+      }
+
+      LECTURAS_GENERALES {
+        int id_lectura PK
+        int id_dispositivo FK
+        int id_paciente FK
+        string tipo_sensor
+        timestamp fecha_hora
+        numeric valor_numerico
+        string modo
+      }
+
+      ECG_BLOQUE {
+        int id PK
+        int id_dispositivo FK
+        int id_paciente FK
+        timestamp fecha_inicio
+        int frecuencia_muestreo
+        int sample_number
+        array valor
+        string modo
+      }
+
+      LECTURA_PNI {
+        int id_lectura PK
+        int id_dispositivo FK
+        int id_paciente FK
+        timestamp fecha_hora
+        int presion_sistolica
+        int presion_diastolica
+        string modo
+      }
+
+      PACIENTE ||--o{ PACIENTE_DISPOSITIVO : "vinculado a"
+      DISPOSITIVO ||--o{ PACIENTE_DISPOSITIVO : "vinculado a"
+      PACIENTE ||--o{ ALERTA : "genera"
+      DISPOSITIVO ||--o{ ALERTA : "emite"
+      PACIENTE ||--o{ RANGO_SIGNO_VITAL : "tiene"
+      DISPOSITIVO ||--o{ SENSOR : "incluye"
+      PACIENTE ||--o{ LECTURAS_GENERALES : "registra"
+      DISPOSITIVO ||--o{ LECTURAS_GENERALES : "captura"
+      PACIENTE ||--o{ ECG_BLOQUE : "registra"
+      DISPOSITIVO ||--o{ ECG_BLOQUE : "captura"
+      PACIENTE ||--o{ LECTURA_PNI : "registra"
+      DISPOSITIVO ||--o{ LECTURA_PNI : "captura"
+    `;
+
+    try {
+      const { svg } = await mermaid.render('erd-svg', diagram);
+      document.getElementById('erd').innerHTML = svg;
+
+      // Redondeo de bordes adaptado
+      document.querySelectorAll('#erd svg .node').forEach(node => {
+        const firstPath = node.querySelector('path[d]');
+        if (!firstPath) return;
+        const d = firstPath.getAttribute('d');
+        const nums = d.match(/-?[\d.]+/g)?.map(Number);
+        if (!nums || nums.length < 8) return;
+        const xs = [nums[0], nums[2], nums[4], nums[6]];
+        const ys = [nums[1], nums[3], nums[5], nums[7]];
+        const x = Math.min(...xs), y = Math.min(...ys);
+        const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', x); rect.setAttribute('y', y);
+        rect.setAttribute('width', w); rect.setAttribute('height', h);
+        rect.setAttribute('rx', '6');
+        for (const a of ['fill','stroke','stroke-width','class','style']) {
+          if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+        }
+        firstPath.replaceWith(rect);
+      });
+
+      document.querySelectorAll('#erd svg .row-rect-odd path, #erd svg .row-rect-even path').forEach(p => {
+        p.setAttribute('stroke','none');
+      });
+
+      // Inicializar SVG Pan & Zoom
+      const svgElement = document.querySelector('#erd svg');
+      const panZoom = svgPanZoom(svgElement, {
+        zoomEnabled: true,
+        controlIconsEnabled: false,
+        fit: true,
+        center: true,
+        minZoom: 0.5,
+        maxZoom: 5,
+        zoomScaleSensitivity: 0.3
+      });
+
+      // Lógica de los botones
+      document.getElementById('zoom-in').addEventListener('click', () => panZoom.zoomIn());
+      document.getElementById('zoom-out').addEventListener('click', () => panZoom.zoomOut());
+      document.getElementById('zoom-reset').addEventListener('click', () => {
+        panZoom.resetZoom();
+        panZoom.center();
+      });
+
+      window.addEventListener('resize', () => {
+        panZoom.resize();
+        panZoom.fit();
+        panZoom.center();
+      });
+
+    } catch (error) {
+      console.error("Error renderizando Mermaid:", error);
+      document.getElementById('erd').innerHTML = '<p style="color: red; padding: 20px;">Hubo un error al renderizar el diagrama.</p>';
+    }
+  </script>
+</body>
+</html>

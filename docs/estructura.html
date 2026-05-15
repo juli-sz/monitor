@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Estructura del Proyecto — Telemetría</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #08090d;
+    --bg2:     #0f1117;
+    --bg3:     #161820;
+    --border:  #1e2130;
+    --accent:  #5b8def;
+    --green:   #3ecf8e;
+    --yellow:  #f0c040;
+    --red:     #e05252;
+    --purple:  #a97fef;
+    --cyan:    #3dd8e8;
+    --muted:   #4a5068;
+    --text:    #c8cfe0;
+    --heading: #e8ecf8;
+    --mono:    'JetBrains Mono', monospace;
+    --sans:    'Syne', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── TOP NAV ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(8,9,13,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 24px;
+  }
+  nav .logo {
+    font-family: var(--sans); font-size: 1rem; font-weight: 800;
+    color: var(--accent); letter-spacing: 0.05em; margin-right: 16px;
+  }
+  nav a {
+    color: var(--muted); text-decoration: none; font-size: 0.72rem;
+    padding: 4px 10px; border-radius: 4px;
+    transition: color .15s, background .15s;
+    letter-spacing: 0.05em;
+  }
+  nav a:hover, nav a.active { color: var(--heading); background: var(--bg3); }
+
+  /* ── LAYOUT ── */
+  .page { max-width: 1360px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  h2 {
+    font-family: var(--sans); font-size: 1.15rem; font-weight: 800;
+    color: var(--heading); letter-spacing: 0.06em; text-transform: uppercase;
+    margin-bottom: 20px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  section { margin-bottom: 56px; }
+
+  /* ── CARDS GRID ── */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; transition: border-color .2s, transform .15s;
+    cursor: default;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card-title {
+    font-family: var(--sans); font-size: 0.85rem; font-weight: 600;
+    color: var(--heading); margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-sub { color: var(--muted); font-size: 0.72rem; margin-bottom: 10px; }
+  .card-desc { color: var(--text); font-size: 0.78rem; line-height: 1.55; }
+  .tag {
+    display: inline-block; padding: 2px 7px; border-radius: 3px;
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.06em;
+    margin: 2px 2px 0 0;
+  }
+  .tag-ws  { background: rgba(62,207,142,.12); color: var(--green); border: 1px solid rgba(62,207,142,.25); }
+  .tag-get    { background: rgba(91,141,239,.1);  color: var(--accent); border: 1px solid rgba(91,141,239,.2); }
+  .tag-post   { background: rgba(62,207,142,.1);  color: var(--green);  border: 1px solid rgba(62,207,142,.2); }
+  .tag-patch  { background: rgba(240,192,64,.1);  color: var(--yellow); border: 1px solid rgba(240,192,64,.2); }
+  .tag-delete { background: rgba(224,82,82,.1);   color: var(--red);    border: 1px solid rgba(224,82,82,.2); }
+  .tag-ws2    { background: rgba(61,216,232,.1);  color: var(--cyan);   border: 1px solid rgba(61,216,232,.2); }
+
+  /* ── DB TABLE ── */
+  .db-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .db-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; transition: border-color .2s;
+  }
+  .db-card:hover { border-color: var(--purple); }
+  .db-header {
+    background: var(--bg3); padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .db-name { font-family: var(--sans); font-weight: 600; color: var(--purple); font-size: 0.82rem; }
+  .db-pk   { font-size: 0.65rem; color: var(--muted); }
+  .db-fields { padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 5px; }
+  .field {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
+    padding: 2px 7px; font-size: 0.68rem; color: var(--text);
+  }
+  .field.pk { color: var(--yellow); border-color: rgba(240,192,64,.3); }
+  .field.fk { color: var(--cyan);   border-color: rgba(61,216,232,.3); }
+  .db-note { padding: 0 14px 10px; font-size: 0.7rem; color: var(--muted); font-style: italic; }
+
+  /* ── FLOW ── */
+  .flow { display: flex; flex-direction: column; gap: 6px; }
+  .flow-group { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .flow-group-title {
+    background: var(--bg3); padding: 8px 14px;
+    font-family: var(--sans); font-size: 0.75rem; font-weight: 600;
+    color: var(--heading); letter-spacing: 0.08em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .flow-steps { padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .flow-step {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 0.76rem; color: var(--text);
+  }
+  .flow-arrow { color: var(--muted); flex-shrink: 0; margin-top: 1px; }
+
+  /* ── ROUTES TABLE ── */
+  .route-table { width: 100%; border-collapse: collapse; }
+  .route-table th {
+    text-align: left; padding: 8px 12px;
+    font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--border);
+    font-family: var(--sans); font-weight: 600;
+  }
+  .route-table td { padding: 7px 12px; border-bottom: 1px solid rgba(30,33,48,.6); font-size: 0.77rem; }
+  .route-table tr:last-child td { border-bottom: none; }
+  .route-table tr:hover td { background: var(--bg3); }
+  .path { color: var(--heading); }
+  .desc { color: var(--muted); }
+  .file-label { color: var(--purple); font-size: 0.7rem; }
+
+  /* ── RELATIONS VISUAL ── */
+  .rel-wrap { display: flex; flex-wrap: wrap; gap: 12px; }
+  .rel-block {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 16px; min-width: 180px; flex: 1 1 180px;
+  }
+  .rel-from { font-family: var(--sans); font-weight: 600; color: var(--purple); font-size: 0.82rem; margin-bottom: 8px; }
+  .rel-item { font-size: 0.73rem; color: var(--text); display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .rel-icon { color: var(--muted); }
+
+  /* ── SECTION IDS ── */
+  #frontend .dot { background: var(--accent); }
+  #backend  .dot { background: var(--green); }
+  #database .dot { background: var(--purple); }
+  #routes   .dot { background: var(--yellow); }
+  #flow     .dot { background: var(--cyan); }
+  #relations .dot { background: var(--red); }
+
+  /* ── SEARCH ── */
+  .search-wrap { margin-bottom: 20px; }
+  .search-wrap input {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--heading); font-family: var(--mono); font-size: 0.82rem;
+    padding: 8px 14px; width: 100%; max-width: 380px;
+    outline: none; transition: border-color .2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap input::placeholder { color: var(--muted); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">⚕ Telemetría</span>
+  <a href="#frontend">Frontend</a>
+  <a href="#backend">Servicios</a>
+  <a href="#routes">Endpoints</a>
+  <a href="#database">Base de Datos</a>
+  <a href="#relations">Relaciones</a>
+  <a href="#flow">Flujo de Datos</a>
+</nav>
+
+<div class="page">
+
+  <!-- ── FRONTEND ── -->
+  <section id="frontend">
+    <h2><span class="dot"></span>Páginas Frontend</h2>
+    <div class="search-wrap">
+      <input type="text" id="searchPages" placeholder="Buscar página..." oninput="filter('searchPages', 'pages-grid', 'card')">
+    </div>
+    <div class="grid" id="pages-grid">
+
+      <div class="card" data-search="login autenticación jwt">
+        <div class="card-title">🔐 Login</div>
+        <div class="card-sub">login.html</div>
+        <div class="card-desc">Autenticación de usuarios. Guarda JWT en localStorage. Redirige a panel.html.</div>
+      </div>
+
+      <div class="card" data-search="panel index tiempo real websocket cards dispositivos">
+        <div class="card-title">📊 Panel (Index)</div>
+        <div class="card-sub">admin/panel.html · app.js</div>
+        <div class="card-desc">Vista principal. Cards en tiempo real por dispositivo activo. Badge rojo si hay alarmas activas. Signos vitales vía WebSocket.</div>
+        <div style="margin-top:8px"><span class="tag tag-ws">WebSocket</span></span></div>
+      </div>
+
+      <div class="card" data-search="pacientes lista tabla crud histórico activos">
+        <div class="card-title">👥 Pacientes</div>
+        <div class="card-sub">admin/pacientes.html</div>
+        <div class="card-desc">Tabla de pacientes activos e históricos. CRUD completo. Botón "Ver" redirige al detalle del paciente por ?id=.</div>
+      </div>
+
+      <div class="card" data-search="detalle paciente historia clinica umbrales signos vitales alarmas historial">
+        <div class="card-title">🧑‍⚕️ Detalle del Paciente</div>
+        <div class="card-sub">admin/detalle.html</div>
+        <div class="card-desc">Historia clínica, umbrales configurados, signos vitales en tiempo real e historial de alarmas. Entrada por ?uid= o ?id=.</div>
+        <div style="margin-top:8px"><span class="tag tag-ws">WebSocket</span></div>
+      </div>
+
+      <div class="card" data-search="monitor ecg spo2 uplot tiempo real pantalla completa">
+        <div class="card-title">📺 Monitor ECG</div>
+        <div class="card-sub">admin/monitorU1.html</div>
+        <div class="card-desc">Monitor a pantalla completa. Gráficos ECG y SpO₂ con uPlot. Panel lateral de vitales. Barra con PNI histórico, temperatura y luz ambiente. Asistolia detection.</div>
+        <div style="margin-top:8px"><span class="tag tag-ws">WebSocket</span></div>
+      </div>
+
+      <div class="card" data-search="alarmas activas alertas sensor paciente agrupadas">
+        <div class="card-title">🔔 Alarmas</div>
+        <div class="card-sub">admin/alarmas.html</div>
+        <div class="card-desc">Vista agrupada de alarmas activas. Una card por paciente, mostrando la última alerta por tipo de sensor.</div>
+      </div>
+
+      <div class="card" data-search="equipos dispositivos vinculación uid estado">
+        <div class="card-title">📟 Equipos</div>
+        <div class="card-sub">admin/equipos.html</div>
+        <div class="card-desc">Lista de dispositivos registrados. Muestra estado y paciente vinculado. Editar y eliminar.</div>
+      </div>
+
+      <div class="card" data-search="sensores umbrales configuración rangos">
+        <div class="card-title">📈 Sensores / Umbrales</div>
+        <div class="card-sub">admin/sensores.html</div>
+        <div class="card-desc">Configuración de sensores y umbrales de alarma por paciente o globales del sistema.</div>
+      </div>
+
+      <div class="card" data-search="usuarios admin médico enfermero roles">
+        <div class="card-title">👤 Usuarios</div>
+        <div class="card-sub">admin/usuarios.html</div>
+        <div class="card-desc">Gestión de usuarios del sistema. Roles: admin, médico, enfermero, visor. Activar/desactivar.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── BACKEND SERVICES ── -->
+  <section id="backend">
+    <h2><span class="dot"></span>Servicios Backend</h2>
+    <div class="grid">
+
+      <div class="card">
+        <div class="card-title">📡 MQTT Service</div>
+        <div class="card-sub">services/mqtt_service.py</div>
+        <div class="card-desc">Cliente MQTT (paho). Recibe datos de los dispositivos físicos por tópicos. Llama a signal_processor para ECG y hace broadcast al WebSocket manager.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔌 WebSocket Manager</div>
+        <div class="card-sub">services/websocket_manager.py</div>
+        <div class="card-desc">Gestiona todas las conexiones WebSocket activas. Broadcast de mensajes a todos los clientes conectados en tiempo real.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🫀 Signal Processor</div>
+        <div class="card-sub">services/signal_processor.py</div>
+        <div class="card-desc">Filtros de señal ECG en tiempo real (ecg_filter_realtime). Normalización y limpieza de la señal antes de enviarse al frontend.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔐 Auth Service</div>
+        <div class="card-sub">services/auth_service.py</div>
+        <div class="card-desc">Generación y validación de tokens JWT. Hashing de contraseñas. Dependencia inyectable para rutas protegidas.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── ENDPOINTS ── -->
+  <section id="routes">
+    <h2><span class="dot"></span>Endpoints API</h2>
+    <div class="search-wrap">
+      <input type="text" id="searchRoutes" placeholder="Buscar endpoint..." oninput="filterTable('searchRoutes', 'routes-tbody')">
+    </div>
+    <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+      <table class="route-table">
+        <thead>
+          <tr>
+            <th>Método</th>
+            <th>Path</th>
+            <th>Descripción</th>
+            <th>Archivo</th>
+          </tr>
+        </thead>
+        <tbody id="routes-tbody">
+          <tr><td><span class="tag tag-post">POST</span></td><td class="path">/auth/registro</td><td class="desc">Registro de nuevo usuario</td><td class="file-label">routes/auth.py</td></tr>
+          <tr><td><span class="tag tag-post">POST</span></td><td class="path">/auth/login</td><td class="desc">Login — devuelve JWT</td><td class="file-label">routes/auth.py</td></tr>
+
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/pacientes/</td><td class="desc">Lista todos los pacientes</td><td class="file-label">routes/pacientes.py</td></tr>
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/pacientes/{id}</td><td class="desc">Detalle de un paciente</td><td class="file-label">routes/pacientes.py</td></tr>
+          <tr><td><span class="tag tag-post">POST</span></td><td class="path">/pacientes/</td><td class="desc">Crear paciente</td><td class="file-label">routes/pacientes.py</td></tr>
+          <tr><td><span class="tag tag-patch">PATCH</span></td><td class="path">/pacientes/{id}</td><td class="desc">Editar paciente</td><td class="file-label">routes/pacientes.py</td></tr>
+          <tr><td><span class="tag tag-delete">DELETE</span></td><td class="path">/pacientes/{id}</td><td class="desc">Eliminar paciente</td><td class="file-label">routes/pacientes.py</td></tr>
+
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/dispositivos/</td><td class="desc">Lista dispositivos (incluye id_paciente activo)</td><td class="file-label">routes/dispositivos.py</td></tr>
+          <tr><td><span class="tag tag-post">POST</span></td><td class="path">/dispositivos/</td><td class="desc">Registrar dispositivo</td><td class="file-label">routes/dispositivos.py</td></tr>
+          <tr><td><span class="tag tag-patch">PATCH</span></td><td class="path">/dispositivos/{id}</td><td class="desc">Editar / vincular dispositivo a paciente</td><td class="file-label">routes/dispositivos.py</td></tr>
+          <tr><td><span class="tag tag-delete">DELETE</span></td><td class="path">/dispositivos/{id}</td><td class="desc">Eliminar dispositivo</td><td class="file-label">routes/dispositivos.py</td></tr>
+
+          <tr><td><span class="tag tag-post">POST</span></td><td class="path">/alertas/</td><td class="desc">Crear nueva alerta</td><td class="file-label">routes/alertas.py</td></tr>
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/alertas/?estado=</td><td class="desc">Listar alertas (filtro: ACTIVA | RESUELTA)</td><td class="file-label">routes/alertas.py</td></tr>
+          <tr><td><span class="tag tag-patch">PATCH</span></td><td class="path">/alertas/resolver/paciente/{id}</td><td class="desc">Resolver alertas activas de un paciente</td><td class="file-label">routes/alertas.py</td></tr>
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/alertas/paciente/{id}</td><td class="desc">Historial completo de alertas de un paciente</td><td class="file-label">routes/alertas.py</td></tr>
+
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/sensores/</td><td class="desc">Lista todos los sensores</td><td class="file-label">routes/sensores.py</td></tr>
+          <tr><td><span class="tag tag-post">POST</span></td><td class="path">/sensores/</td><td class="desc">Crear sensor</td><td class="file-label">routes/sensores.py</td></tr>
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/sensores/paciente/{id}</td><td class="desc">Umbrales configurados para un paciente</td><td class="file-label">routes/sensores.py</td></tr>
+
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/historico/{uid}/{sensor}</td><td class="desc">Historial de lecturas de un sensor por equipo</td><td class="file-label">routes/historico.py</td></tr>
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/ecg/imagen_10s/{uid}</td><td class="desc">Imagen PNG del último bloque ECG de 10s</td><td class="file-label">routes/historico.py</td></tr>
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/historico_ecg/{uid}</td><td class="desc">Bloques ECG del equipo</td><td class="file-label">routes/historico.py</td></tr>
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/historico_ecg_segmentado/{uid}</td><td class="desc">ECG segmentado por latidos</td><td class="file-label">routes/historico.py</td></tr>
+
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/usuarios/</td><td class="desc">Lista usuarios del sistema</td><td class="file-label">routes/usuarios.py</td></tr>
+          <tr><td><span class="tag tag-post">POST</span></td><td class="path">/usuarios/</td><td class="desc">Crear usuario</td><td class="file-label">routes/usuarios.py</td></tr>
+          <tr><td><span class="tag tag-patch">PATCH</span></td><td class="path">/usuarios/{id}/estado</td><td class="desc">Activar / desactivar usuario</td><td class="file-label">routes/usuarios.py</td></tr>
+
+          <tr><td><span class="tag tag-get">GET</span></td><td class="path">/pacientes_por_dispositivo_uid/{uid}</td><td class="desc">Paciente activo vinculado a un equipo por UID</td><td class="file-label">mainf.py</td></tr>
+
+          <tr><td><span class="tag tag-ws2">WS</span></td><td class="path">/ws/datos</td><td class="desc">WebSocket — broadcast de todos los sensores en tiempo real</td><td class="file-label">routes/websockets.py</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── DATABASE ── -->
+  <section id="database">
+    <h2><span class="dot"></span>Base de Datos</h2>
+    <div class="db-grid">
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">usuario</span>
+          <span class="db-pk">PK: id_usuario</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id_usuario</span>
+          <span class="field">email</span><span class="field">password_hash</span>
+          <span class="field">nombre</span><span class="field">rol</span>
+          <span class="field">activo</span><span class="field">creado_en</span>
+        </div>
+        <div class="db-note">Roles: admin · medico · enfermero · visor</div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">paciente</span>
+          <span class="db-pk">PK: id_paciente</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id_paciente</span>
+          <span class="field">nombre</span><span class="field">apellido</span>
+          <span class="field">dni</span><span class="field">fecha_nacimiento</span>
+          <span class="field">sexo</span><span class="field">tipo</span>
+          <span class="field">diagnostico</span><span class="field">fecha_egreso</span>
+          <span class="field">creado_en</span>
+        </div>
+        <div class="db-note">fecha_egreso = NULL → activo · ≠ NULL → histórico</div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">dispositivo</span>
+          <span class="db-pk">PK: id_dispositivo</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id_dispositivo</span>
+          <span class="field">uid_equipo</span>
+          <span class="field">estado</span><span class="field">creado_en</span>
+        </div>
+        <div class="db-note">uid_equipo = identificador físico único (ej: Eq1)</div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">paciente_dispositivo</span>
+          <span class="db-pk">PK: id</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id</span>
+          <span class="field fk">id_paciente →</span>
+          <span class="field fk">id_dispositivo →</span>
+          <span class="field">fecha_hora_asoc</span>
+          <span class="field">fecha_hora_disoc</span>
+        </div>
+        <div class="db-note">fecha_hora_disoc = NULL → vinculación activa</div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">alerta</span>
+          <span class="db-pk">PK: id_alerta</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id_alerta</span>
+          <span class="field fk">id_dispositivo →</span>
+          <span class="field fk">id_paciente →</span>
+          <span class="field">descripcion</span>
+          <span class="field">estado</span>
+          <span class="field">fecha_hora</span>
+          <span class="field">resuelta_en</span>
+        </div>
+        <div class="db-note">estado: ACTIVA | RESUELTA</div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">rango_signo_vital</span>
+          <span class="db-pk">PK: id_rango</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id_rango</span>
+          <span class="field fk">id_paciente →</span>
+          <span class="field">tipo_signo</span>
+          <span class="field">valor_minimo</span>
+          <span class="field">valor_maximo</span>
+          <span class="field">unidad</span>
+        </div>
+        <div class="db-note">id_paciente = NULL → rango global del sistema</div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">sensor</span>
+          <span class="db-pk">PK: id_sensor</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id_sensor</span>
+          <span class="field fk">id_dispositivo →</span>
+          <span class="field">tipo</span>
+          <span class="field">estado</span>
+          <span class="field">creado_en</span>
+        </div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">lecturas_generales</span>
+          <span class="db-pk">PK: id_lectura</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id_lectura</span>
+          <span class="field fk">id_dispositivo →</span>
+          <span class="field fk">id_paciente →</span>
+          <span class="field">tipo_sensor</span>
+          <span class="field">fecha_hora</span>
+          <span class="field">valor_numerico</span>
+          <span class="field">modo</span>
+        </div>
+        <div class="db-note">SPO2, temperatura, luz — un registro por lectura</div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">ecg_bloque</span>
+          <span class="db-pk">PK: id</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id</span>
+          <span class="field fk">id_dispositivo →</span>
+          <span class="field fk">id_paciente →</span>
+          <span class="field">fecha_inicio</span>
+          <span class="field">frecuencia_muestreo</span>
+          <span class="field">sample_number</span>
+          <span class="field">valor [ ]</span>
+          <span class="field">modo</span>
+        </div>
+        <div class="db-note">valor = ARRAY de muestras crudas de ECG</div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-header">
+          <span class="db-name">lectura_pni</span>
+          <span class="db-pk">PK: id_lectura</span>
+        </div>
+        <div class="db-fields">
+          <span class="field pk">id_lectura</span>
+          <span class="field fk">id_dispositivo →</span>
+          <span class="field fk">id_paciente →</span>
+          <span class="field">fecha_hora</span>
+          <span class="field">presion_sistolica</span>
+          <span class="field">presion_diastolica</span>
+          <span class="field">modo</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── RELATIONS ── -->
+  <section id="relations">
+    <h2><span class="dot"></span>Relaciones entre Tablas</h2>
+    <div class="rel-wrap">
+      <div class="rel-block">
+        <div class="rel-from">paciente</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> alerta (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> rango_signo_vital (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> lecturas_generales (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> ecg_bloque (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> lectura_pni (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">⇌</span> dispositivo vía paciente_dispositivo</div>
+      </div>
+      <div class="rel-block">
+        <div class="rel-from">dispositivo</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> alerta (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> sensor (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> lecturas_generales (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> ecg_bloque (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">↘</span> lectura_pni (1→N)</div>
+        <div class="rel-item"><span class="rel-icon">⇌</span> paciente vía paciente_dispositivo</div>
+      </div>
+      <div class="rel-block">
+        <div class="rel-from">paciente_dispositivo</div>
+        <div class="rel-item"><span class="rel-icon">→</span> paciente.id_paciente (FK)</div>
+        <div class="rel-item"><span class="rel-icon">→</span> dispositivo.id_dispositivo (FK)</div>
+        <div class="rel-item" style="margin-top:8px; color:var(--muted); font-size:0.7rem">Tabla pivot de vinculación. fecha_hora_disoc = NULL indica la asociación activa.</div>
+      </div>
+      <div class="rel-block">
+        <div class="rel-from">rango_signo_vital</div>
+        <div class="rel-item"><span class="rel-icon">→</span> paciente.id_paciente (FK, nullable)</div>
+        <div class="rel-item" style="margin-top:8px; color:var(--muted); font-size:0.7rem">id_paciente = NULL → rango global aplicado a todos los pacientes sin configuración personalizada.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FLOW ── -->
+  <section id="flow">
+    <h2><span class="dot"></span>Flujo de Datos</h2>
+    <div class="flow">
+
+      <div class="flow-group">
+        <div class="flow-group-title">📡 Tiempo Real (Sensores → Frontend)</div>
+        <div class="flow-steps">
+          <div class="flow-step"><span class="flow-arrow">1.</span> Dispositivo físico publica en MQTT Broker (tópico por sensor)</div>
+          <div class="flow-step"><span class="flow-arrow">2.</span> mqtt_service.py recibe mensaje → signal_processor filtra ECG</div>
+          <div class="flow-step"><span class="flow-arrow">3.</span> ws_manager.broadcast(msg) → envía a todos los WebSocket conectados</div>
+          <div class="flow-step"><span class="flow-arrow">4.</span> app.js / detalle.html / monitorU1.html reciben y filtran por Uid_Equipo</div>
+          <div class="flow-step"><span class="flow-arrow">5.</span> UI actualiza cards, gráficos uPlot y valores numéricos</div>
+        </div>
+      </div>
+
+      <div class="flow-group">
+        <div class="flow-group-title">🔔 Ciclo de Vida de una Alarma</div>
+        <div class="flow-steps">
+          <div class="flow-step"><span class="flow-arrow">1.</span> signal_processor detecta valor fuera del rango_signo_vital del paciente</div>
+          <div class="flow-step"><span class="flow-arrow">2.</span> POST /alertas/ → crea alerta con estado = ACTIVA</div>
+          <div class="flow-step"><span class="flow-arrow">3.</span> app.js consulta GET /alertas/?estado=ACTIVA → marca card del panel con badge rojo</div>
+          <div class="flow-step"><span class="flow-arrow">4.</span> Médico visualiza en admin/alarmas.html → una card por paciente, última alerta por sensor</div>
+          <div class="flow-step"><span class="flow-arrow">5.</span> PATCH /alertas/resolver/paciente/{id} → estado = RESUELTA + resuelta_en = now()</div>
+        </div>
+      </div>
+
+      <div class="flow-group">
+        <div class="flow-group-title">🔗 Vinculación Paciente ↔ Dispositivo</div>
+        <div class="flow-steps">
+          <div class="flow-step"><span class="flow-arrow">1.</span> PATCH /dispositivos/{id} con id_paciente → inserta fila en paciente_dispositivo con fecha_hora_asoc</div>
+          <div class="flow-step"><span class="flow-arrow">2.</span> GET /pacientes_por_dispositivo_uid/{uid} → busca paciente_dispositivo donde fecha_hora_disoc = NULL</div>
+          <div class="flow-step"><span class="flow-arrow">3.</span> Para desvincular: PATCH actualiza fecha_hora_disoc = now() en el registro anterior</div>
+          <div class="flow-step"><span class="flow-arrow">4.</span> GET /dispositivos/ devuelve id_paciente activo (el de la asociación activa)</div>
+        </div>
+      </div>
+
+      <div class="flow-group">
+        <div class="flow-group-title">🧭 Navegación Frontend</div>
+        <div class="flow-steps">
+          <div class="flow-step"><span class="flow-arrow">→</span> login.html → (JWT) → admin/panel.html</div>
+          <div class="flow-step"><span class="flow-arrow">→</span> panel.html → card click → admin/detalle.html?uid={uid}</div>
+          <div class="flow-step"><span class="flow-arrow">→</span> pacientes.html → "Ver" → admin/detalle.html?id={id_paciente}</div>
+          <div class="flow-step"><span class="flow-arrow">→</span> detalle.html → "ABRIR MONITOR ECG" → admin/monitorU1.html?uid={uid}</div>
+          <div class="flow-step"><span class="flow-arrow">→</span> alarmas.html → badge paciente → admin/detalle.html?id={id_paciente}</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+<script>
+  function filter(inputId, gridId, cardClass) {
+    const q = document.getElementById(inputId).value.toLowerCase();
+    document.querySelectorAll(`#${gridId} .${cardClass}`).forEach(el => {
+      const text = (el.textContent + ' ' + (el.dataset.search||'')).toLowerCase();
+      el.classList.toggle('hidden', q && !text.includes(q));
+    });
+  }
+
+  function filterTable(inputId, tbodyId) {
+    const q = document.getElementById(inputId).value.toLowerCase();
+    document.querySelectorAll(`#${tbodyId} tr`).forEach(tr => {
+      tr.classList.toggle('hidden', q && !tr.textContent.toLowerCase().includes(q));
+    });
+  }
+
+  // Nav active state on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('nav a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => { if (window.scrollY >= s.offsetTop - 80) current = s.id; });
+    navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current));
+  });
+</script>
+
+</body>
+</html>

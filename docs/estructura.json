@@ -1,0 +1,258 @@
+{
+  "project": {
+    "name": "Telemetría — Sistema de Monitoreo de Signos Vitales",
+    "stack": {
+      "backend": "FastAPI + SQLAlchemy + PostgreSQL",
+      "frontend": "HTML/CSS/JS + Bootstrap 5",
+      "realtime": "WebSocket (FastAPI) + MQTT (paho)",
+      "auth": "JWT"
+    },
+    "entrypoint": "mainf.py"
+  },
+
+  "database": {
+    "tables": [
+      {
+        "name": "usuario",
+        "pk": "id_usuario",
+        "fields": ["email", "password_hash", "nombre", "rol", "activo", "creado_en"],
+        "notes": "Roles: admin, medico, enfermero, visor"
+      },
+      {
+        "name": "paciente",
+        "pk": "id_paciente",
+        "fields": ["nombre", "apellido", "dni", "fecha_nacimiento", "sexo", "diagnostico", "tipo", "fecha_egreso", "creado_en"],
+        "notes": "fecha_egreso=NULL → activo; fecha_egreso≠NULL → histórico"
+      },
+      {
+        "name": "dispositivo",
+        "pk": "id_dispositivo",
+        "fields": ["uid_equipo", "estado", "creado_en"],
+        "notes": "uid_equipo es el identificador físico único (ej: Eq1)"
+      },
+      {
+        "name": "paciente_dispositivo",
+        "pk": "id",
+        "fields": ["id_paciente", "id_dispositivo", "fecha_hora_asoc", "fecha_hora_disoc"],
+        "notes": "fecha_hora_disoc=NULL → vinculación activa"
+      },
+      {
+        "name": "alerta",
+        "pk": "id_alerta",
+        "fields": ["id_dispositivo", "id_paciente", "descripcion", "estado", "fecha_hora", "resuelta_en"],
+        "notes": "estado: ACTIVA | RESUELTA"
+      },
+      {
+        "name": "rango_signo_vital",
+        "pk": "id_rango",
+        "fields": ["id_paciente", "tipo_signo", "valor_minimo", "valor_maximo", "unidad"],
+        "notes": "id_paciente=NULL → rango global del sistema"
+      },
+      {
+        "name": "sensor",
+        "pk": "id_sensor",
+        "fields": ["id_dispositivo", "tipo", "estado", "creado_en"]
+      },
+      {
+        "name": "lecturas_generales",
+        "pk": "id_lectura",
+        "fields": ["id_dispositivo", "id_paciente", "tipo_sensor", "fecha_hora", "valor_numerico", "modo"]
+      },
+      {
+        "name": "ecg_bloque",
+        "pk": "id",
+        "fields": ["id_dispositivo", "id_paciente", "fecha_inicio", "frecuencia_muestreo", "sample_number", "valor (ARRAY)", "modo"],
+        "notes": "valor es array de muestras crudas de ECG"
+      },
+      {
+        "name": "lectura_pni",
+        "pk": "id_lectura",
+        "fields": ["id_dispositivo", "id_paciente", "fecha_hora", "presion_sistolica", "presion_diastolica", "modo"]
+      }
+    ]
+  },
+
+  "backend": {
+    "services": [
+      {
+        "file": "services/mqtt_service.py",
+        "role": "Cliente MQTT — recibe datos de los dispositivos físicos y los reenvía al WebSocket manager"
+      },
+      {
+        "file": "services/websocket_manager.py",
+        "role": "Gestiona conexiones WebSocket activas y broadcast de mensajes en tiempo real"
+      },
+      {
+        "file": "services/signal_processor.py",
+        "role": "Filtros de señal ECG en tiempo real (ecg_filter_realtime)"
+      },
+      {
+        "file": "services/auth_service.py",
+        "role": "Generación y validación de tokens JWT"
+      }
+    ],
+    "routes": [
+      {
+        "file": "routes/auth.py",
+        "prefix": "/auth",
+        "endpoints": [
+          { "method": "POST", "path": "/registro", "description": "Registro de nuevo usuario" },
+          { "method": "POST", "path": "/login",    "description": "Login — devuelve JWT" }
+        ]
+      },
+      {
+        "file": "routes/pacientes.py",
+        "prefix": "/pacientes",
+        "endpoints": [
+          { "method": "GET",    "path": "/",              "description": "Lista todos los pacientes" },
+          { "method": "GET",    "path": "/{id_paciente}", "description": "Detalle de un paciente" },
+          { "method": "POST",   "path": "/",              "description": "Crear paciente" },
+          { "method": "PATCH",  "path": "/{id_paciente}", "description": "Editar paciente" },
+          { "method": "DELETE", "path": "/{id_paciente}", "description": "Eliminar paciente" }
+        ]
+      },
+      {
+        "file": "routes/dispositivos.py",
+        "prefix": "/dispositivos",
+        "endpoints": [
+          { "method": "GET",    "path": "/",                  "description": "Lista todos los dispositivos (incluye id_paciente activo)" },
+          { "method": "POST",   "path": "/",                  "description": "Registrar dispositivo" },
+          { "method": "PATCH",  "path": "/{id_dispositivo}",  "description": "Editar/vincular dispositivo a paciente" },
+          { "method": "DELETE", "path": "/{id_dispositivo}",  "description": "Eliminar dispositivo" }
+        ]
+      },
+      {
+        "file": "routes/alertas.py",
+        "prefix": "/alertas",
+        "endpoints": [
+          { "method": "POST",  "path": "/",                        "description": "Crear nueva alerta" },
+          { "method": "GET",   "path": "/",                        "description": "Listar alertas (filtro: ?estado=ACTIVA|RESUELTA)" },
+          { "method": "PATCH", "path": "/resolver/paciente/{id}",  "description": "Resolver alertas activas de un paciente" },
+          { "method": "GET",   "path": "/paciente/{id_paciente}",  "description": "Historial completo de alertas de un paciente" }
+        ]
+      },
+      {
+        "file": "routes/sensores.py",
+        "prefix": "/sensores",
+        "endpoints": [
+          { "method": "GET",  "path": "/",                      "description": "Lista todos los sensores" },
+          { "method": "POST", "path": "/",                      "description": "Crear sensor" },
+          { "method": "GET",  "path": "/paciente/{id_paciente}","description": "Umbrales/rangos configurados para un paciente" }
+        ]
+      },
+      {
+        "file": "routes/historico.py",
+        "prefix": "",
+        "endpoints": [
+          { "method": "GET", "path": "/historico/{uid}/{sensor}",        "description": "Historial de lecturas de un sensor para un equipo" },
+          { "method": "GET", "path": "/ecg/imagen_10s/{uid}",            "description": "Imagen PNG del último bloque ECG de 10s" },
+          { "method": "GET", "path": "/historico_ecg/{uid}",             "description": "Bloques ECG del equipo" },
+          { "method": "GET", "path": "/historico_ecg_segmentado/{uid}",  "description": "ECG segmentado por latidos" }
+        ]
+      },
+      {
+        "file": "routes/usuarios.py",
+        "prefix": "/usuarios",
+        "endpoints": [
+          { "method": "GET",   "path": "/",                    "description": "Lista usuarios del sistema" },
+          { "method": "POST",  "path": "/",                    "description": "Crear usuario" },
+          { "method": "PATCH", "path": "/{id_usuario}/estado", "description": "Activar / desactivar usuario" }
+        ]
+      },
+      {
+        "file": "routes/websockets.py",
+        "prefix": "/ws",
+        "endpoints": [
+          { "method": "WS", "path": "/ws/datos", "description": "WebSocket principal — broadcast de todos los sensores en tiempo real" }
+        ]
+      },
+      {
+        "file": "mainf.py",
+        "prefix": "",
+        "endpoints": [
+          { "method": "GET", "path": "/pacientes_por_dispositivo_uid/{uid}", "description": "Devuelve el paciente activo vinculado a un equipo por su UID" }
+        ]
+      }
+    ]
+  },
+
+  "frontend": {
+    "pages": [
+      {
+        "file": "login.html",
+        "title": "Login",
+        "description": "Autenticación de usuarios — guarda JWT en localStorage",
+        "nav_to": ["admin/panel.html"]
+      },
+      {
+        "file": "admin/panel.html",
+        "title": "Panel (Index)",
+        "description": "Vista principal — cards en tiempo real por dispositivo activo. Muestra signos vitales vía WebSocket. Badge rojo si hay alarmas activas.",
+        "uses_ws": true,
+        "js_file": "app.js",
+        "nav_to": ["admin/detalle.html?uid=", "admin/pacientes.html", "admin/equipos.html", "admin/alarmas.html"]
+      },
+      {
+        "file": "admin/pacientes.html",
+        "title": "Pacientes",
+        "description": "Tabla de pacientes activos e históricos. CRUD completo. Botón Ver redirige al detalle por id.",
+        "nav_to": ["admin/detalle.html?id="]
+      },
+      {
+        "file": "admin/detalle.html",
+        "title": "Detalle del Paciente",
+        "description": "Perfil completo: historia clínica, umbrales, signos vitales en tiempo real (WebSocket) e historial de alarmas. Soporta entrada por ?uid= (desde panel) o ?id= (desde pacientes).",
+        "uses_ws": true,
+        "nav_to": ["admin/monitorU1.html?uid="]
+      },
+      {
+        "file": "admin/monitorU1.html",
+        "title": "Monitor ECG",
+        "description": "Monitor de paciente a pantalla completa. Gráficos ECG y SpO2 en tiempo real con uPlot. Panel lateral de vitales. Barra inferior con PNI histórico, temperatura y luz ambiente.",
+        "uses_ws": true
+      },
+      {
+        "file": "admin/alarmas.html",
+        "title": "Alarmas",
+        "description": "Vista agrupada de alarmas activas. Una card por paciente, mostrando la última alerta de cada sensor.",
+        "nav_to": ["admin/detalle.html?id="]
+      },
+      {
+        "file": "admin/equipos.html",
+        "title": "Equipos",
+        "description": "Lista de dispositivos registrados. Muestra estado y paciente vinculado. Permite editar y eliminar."
+      },
+      {
+        "file": "admin/sensores.html",
+        "title": "Sensores",
+        "description": "Configuración de sensores y umbrales de alarma por paciente o globales."
+      },
+      {
+        "file": "admin/usuarios.html",
+        "title": "Usuarios",
+        "description": "Gestión de usuarios del sistema (admin, médico, enfermero, visor)."
+      }
+    ]
+  },
+
+  "data_flow": {
+    "realtime": [
+      "Dispositivo físico → MQTT Broker",
+      "mqtt_service.py → recibe tópico → llama signal_processor para ECG",
+      "mqtt_service.py → ws_manager.broadcast(msg)",
+      "WebSocket /ws/datos → todos los clientes conectados",
+      "app.js / detalle.html / monitorU1.html → filtran por Uid_Equipo"
+    ],
+    "alarm_lifecycle": [
+      "signal_processor detecta valor fuera de rango",
+      "POST /alertas/ → crea alerta con estado=ACTIVA",
+      "app.js consulta GET /alertas/?estado=ACTIVA → marca card con badge rojo",
+      "PATCH /alertas/resolver/paciente/{id} → cambia estado a RESUELTA + guarda resuelta_en"
+    ],
+    "patient_device_link": [
+      "POST /dispositivos/ con id_paciente → crea fila en paciente_dispositivo con fecha_hora_asoc",
+      "GET /pacientes_por_dispositivo_uid/{uid} → busca PacienteDispositivo donde fecha_hora_disoc=NULL",
+      "PATCH /dispositivos/{id} → puede cambiar id_paciente (desvincula anterior, vincula nuevo)"
+    ]
+  }
+}

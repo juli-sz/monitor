@@ -6,25 +6,56 @@ API desarrollada con FastAPI para la gestión y monitoreo en tiempo real de sign
 
 ## 🚀 Tecnologías utilizadas
 
-* Python 3
+* **Backend:** Python 3.10+ (FastAPI, Uvicorn)
 * FastAPI
-* PostgreSQL
-* SQLAlchemy
-* MQTT (paho-mqtt)
-* NumPy / SciPy (procesamiento de señal ECG)
+* **Base de Datos:** PostgreSQL & SQLAlchemy (ORM)
+* **Protocolos:** MQTT (paho-mqtt) para recepción de sensores & WebSockets para streaming en vivo.
+* **Procesamiento:** NumPy & SciPy (Filtros digitales para ondas ECG).
+* **Frontend:** HTML5, CSS3, JavaScript (Bootstrap 5).
+* **Servicios:** Eclipse Mosquitto (Broker MQTT).
 * WebSockets
 * Matplotlib
 
 ---
 
+## 📁 Estructura del Proyecto
+
+```text
+📂 monitor
+ ┣ 📂admin                # Interfaz del panel de control web (Frontend)
+ ┃ ┣ 📜alarmas.html       # Central de monitoreo de alarmas críticas
+ ┃ ┣ 📜equipos.html       # Gestión y vinculación de hardware a pacientes
+ ┃ ┗ 📜pacientes.html     # ABM de internados e historial clínico
+ ┣ 📂routes               # Endpoints de la API (Controladores)
+ ┃ ┣ 📜alertas.py         # Lógica de disparadores y resolución de alarmas
+ ┃ ┣ 📜dispositivos.py    # Gestión de hardware físico
+ ┃ ┗ 📜pacientes.py       # Gestión de ingreso/egreso de pacientes
+ ┣ 📂schemas              # Modelos de validación (Pydantic)
+ ┣ 📂services             # Lógica de negocio (MQTT & Signal Processing)
+ ┣ 📜database.py          # Configuración de conexión a PostgreSQL
+ ┣ 📜mainf.py             # Punto de entrada principal de la aplicación
+ ┣ 📜models.py            # Definición de tablas (SQLAlchemy Models)
+ ┗ 📜requirements.txt     # Dependencias del proyecto
+
+---
+
 ## 📦 Instalación
 
-### 1. Clonar el repositorio
+### 1. Clonar y Preparar el Entorno Python
 
-```bash
-git clone https://github.com/juli-sz/monitor
+# Clonar el repositorio
+git clone [https://github.com/juli-sz/monitor](https://github.com/juli-sz/monitor)
 cd monitor
-```
+
+# Crear entorno virtual
+python -m venv venv
+
+# Activar entorno (Windows)
+venv\Scripts\activate
+
+# Instalar dependencias
+
+pip install -r requirements.txt
 
 ---
 

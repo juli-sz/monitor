@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 import models
 from models import Dispositivo, Paciente, PacienteDispositivo, ECG, LecturaPNI, LecturaGeneral
 from services.signal_processor import ecg_filter_realtime
+from services.auth_service import obtener_usuario_actual
 from database import Base, engine, get_db
 
 # Importamos nuestras rutas y el manager
@@ -62,15 +63,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(ws_router)
-
-
 # ======================================================
 # ENDPOINTS
 # ======================================================
 
 @app.get("/pacientes_por_dispositivo_uid/{uid_equipo}")
-def obtener_paciente_por_uid(uid_equipo: str, db: Session = Depends(get_db)):
+def obtener_paciente_por_uid(
+    uid_equipo: str,
+    db: Session = Depends(get_db),
+    _=Depends(obtener_usuario_actual),
+):
     # 1. Buscamos el dispositivo
     disp = db.query(Dispositivo).filter(Dispositivo.uid_equipo == uid_equipo).first()
     if not disp:

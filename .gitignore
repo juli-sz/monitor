@@ -1,7 +1,22 @@
+# Entornos virtuales
 mi_entorno/
 venv/
-.venv
+.venv/
+
+# Python
 __pycache__/
 *.pyc
-.envgit rm -r --cached mi_entorno
+
+# Credenciales (NUNCA subir al repo)
 .env
+
+# Testing / cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# claude
+.claude
+claude.exe
+*.exe
+

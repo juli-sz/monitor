@@ -15,15 +15,17 @@ import matplotlib.pyplot as plt
 from database import get_db
 from models import Dispositivo, LecturaGeneral, ECG
 from services.signal_processor import ecg_filter_realtime
+from services.auth_service import obtener_usuario_actual
 
 router = APIRouter(tags=["Histórico y Telemetría"])
 
 @router.get("/historico/{uid_equipo}/{sensor}")
 def historico_sensor(
-    uid_equipo: str, 
-    sensor: str, 
-    fecha: Optional[str] = Query(None, description="Formato YYYY-MM-DD"), 
-    db: Session = Depends(get_db)
+    uid_equipo: str,
+    sensor: str,
+    fecha: Optional[str] = Query(None, description="Formato YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    _=Depends(obtener_usuario_actual),
 ):
     # ... (Tu código exacto queda igual) ...
     disp = db.query(Dispositivo).filter(Dispositivo.uid_equipo == uid_equipo).first()
@@ -49,7 +51,7 @@ def historico_sensor(
 
 
 @router.get("/ecg/imagen_10s/{uid}")
-def ecg_10s_imagen(uid: str, db: Session = Depends(get_db)):
+def ecg_10s_imagen(uid: str, db: Session = Depends(get_db), _=Depends(obtener_usuario_actual)):
     # ... (Tu código exacto para generar el PNG, queda idéntico) ...
     ecg_blocks = (
         db.query(ECG)
@@ -86,7 +88,8 @@ def ecg_10s_imagen(uid: str, db: Session = Depends(get_db)):
 def historico_ecg(
     uid_equipo: str,
     fecha: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _=Depends(obtener_usuario_actual),
 ):
     disp = db.query(Dispositivo).filter(Dispositivo.uid_equipo == uid_equipo).first()
     if not disp:
@@ -117,7 +120,13 @@ def historico_ecg(
 
     return {"uid": uid_equipo, "ecg": respuesta}
 @router.get("/historico_ecg_segmentado/{uid}")
-def historico_ecg_segmentado(uid: str, t0: float, t1: float, db: Session = Depends(get_db)):
+def historico_ecg_segmentado(
+    uid: str,
+    t0: float,
+    t1: float,
+    db: Session = Depends(get_db),
+    _=Depends(obtener_usuario_actual),
+):
     """
     Devuelve solo un segmento de ECG entre timestamps t0 y t1.
     t0 y t1 son tiempos UNIX en segundos.

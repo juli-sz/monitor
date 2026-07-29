@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from database import get_db
 from models import Usuario
-from passlib.context import CryptContext
+from services.auth_service import hashear_password
+from services.permissions import requiere_rol, ROLES_VALIDOS
 
-# Configuramos el encriptador de contraseñas
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
+# Gestión de usuarios: solo admin (ver README, "Admin: CRUD total (usuarios, ...)").
+router = APIRouter(
+    prefix="/usuarios",
+    tags=["Usuarios"],
+    dependencies=[Depends(requiere_rol("admin"))],
+)
 
 # ======================================================
 # ESQUEMAS (PYDANTIC)
@@ -26,8 +29,7 @@ class UsuarioResponse(BaseModel):
     rol: str
     activo: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ======================================================
 # GET: Listar todos los usuarios
@@ -47,12 +49,11 @@ def crear_usuario(usuario_in: UsuarioCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     
     # 2. Validamos que el rol sea uno de los permitidos por tu base de datos
-    roles_permitidos = ['admin', 'medico', 'enfermero', 'visor']
-    if usuario_in.rol not in roles_permitidos:
+    if usuario_in.rol not in ROLES_VALIDOS:
         raise HTTPException(status_code=400, detail="Rol inválido")
 
     # 3. Encriptamos la contraseña
-    hashed_password = pwd_context.hash(usuario_in.password)
+    hashed_password = hashear_password(usuario_in.password)
     
     # 4. Guardamos en la base
     nuevo_usuario = Usuario(

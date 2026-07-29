@@ -212,7 +212,9 @@ function actualizarSensorDinamico(uid, idSensor, label, valor, colorClass = "tex
 let ws;
 
 function conectarWebSocket() {
-  ws = new WebSocket(CONFIG.WS_URL);
+  // Un WebSocket del navegador no puede mandar headers en el handshake,
+  // así que el token viaja como query param.
+  ws = new WebSocket(`${CONFIG.WS_URL}?token=${token}`);
 
   ws.onopen = () => {
     console.log("✅ Conectado al WebSocket de la API");

@@ -1,0 +1,12 @@
+[run]
+source = .
+omit =
+    tests/*
+    pruebas_sensores/*
+    docs/*
+
+[report]
+# Líneas que no tiene sentido exigir en la cobertura
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:

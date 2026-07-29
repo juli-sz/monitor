@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 class DispositivoBase(BaseModel):
@@ -20,5 +20,4 @@ class DispositivoResponse(DispositivoBase):
     paciente_asignado: Optional[str] = "Sin asignar"
     id_paciente: Optional[int] = None  # Agregado para que el modal sepa quién está seleccionado
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

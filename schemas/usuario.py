@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional
 
 class UsuarioCrear(BaseModel):
@@ -15,6 +15,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     rol: str
+    nombre: str  # login.html guarda data.nombre en localStorage; sin este campo response_model lo filtraba
 
 class UsuarioResponse(BaseModel):
     id_usuario: int
@@ -23,5 +24,4 @@ class UsuarioResponse(BaseModel):
     rol: str
     activo: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

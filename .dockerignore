@@ -1,0 +1,18 @@
+# Nada de esto entra a la imagen
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.env
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+mi_entorno/
+
+# Documentación y simuladores: no hacen falta dentro del contenedor
+docs/
+pruebas_sensores/
+DOCKER.md
+README.md

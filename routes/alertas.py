@@ -6,13 +6,20 @@ from models import Alerta, Dispositivo, PacienteDispositivo
 from schemas.alerta import AlertaCreate
 from typing import Optional
 
+from services.auth_service import obtener_usuario_actual
+from services.permissions import requiere_rol
+
 router = APIRouter(prefix="/alertas", tags=["Alertas"])
-    
+
 # ======================================================
-# POST: Registrar nueva alarma desde el monitor (MQTT)
+# POST: Registrar nueva alarma desde el monitor (Admin y Médico)
 # ======================================================
 @router.post("/")
-def registrar_alerta(alerta_in: AlertaCreate, db: Session = Depends(get_db)):
+def registrar_alerta(
+    alerta_in: AlertaCreate,
+    db: Session = Depends(get_db),
+    _=Depends(requiere_rol("admin", "medico")),
+):
     disp = db.query(Dispositivo).filter(Dispositivo.uid_equipo == alerta_in.uid_equipo).first()
     if not disp:
         return {"error": "Equipo no encontrado"}
@@ -42,7 +49,11 @@ def registrar_alerta(alerta_in: AlertaCreate, db: Session = Depends(get_db)):
 # GET: Obtener todas las alertas (con filtro opcional por estado)
 # ======================================================
 @router.get("/")
-def obtener_todas_las_alertas(estado: Optional[str] = None, db: Session = Depends(get_db)):
+def obtener_todas_las_alertas(
+    estado: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _=Depends(obtener_usuario_actual),
+):
     query = db.query(Alerta)
     
     if estado:
@@ -68,11 +79,14 @@ def obtener_todas_las_alertas(estado: Optional[str] = None, db: Session = Depend
 
 # ======================================================
 # PATCH: Resolver todas las alarmas de un paciente manualmente
+# (Admin, Médico y Enfermero)
 # ======================================================
-# Buscá esta función en routes/alertas.py y dejala así:
-
 @router.patch("/resolver/paciente/{id_paciente}")
-def resolver_alarmas_paciente(id_paciente: int, db: Session = Depends(get_db)):
+def resolver_alarmas_paciente(
+    id_paciente: int,
+    db: Session = Depends(get_db),
+    _=Depends(requiere_rol("admin", "medico", "enfermero")),
+):
     alertas = db.query(Alerta).filter(
         Alerta.id_paciente == id_paciente, 
         Alerta.estado == "ACTIVA"
@@ -88,7 +102,11 @@ def resolver_alarmas_paciente(id_paciente: int, db: Session = Depends(get_db)):
 # GET: Obtener historial de alertas de un paciente
 # ======================================================
 @router.get("/paciente/{id_paciente}")
-def obtener_alertas_paciente(id_paciente: int, db: Session = Depends(get_db)):
+def obtener_alertas_paciente(
+    id_paciente: int,
+    db: Session = Depends(get_db),
+    _=Depends(obtener_usuario_actual),
+):
     alertas_db = db.query(Alerta).filter(
         Alerta.id_paciente == id_paciente
     ).order_by(Alerta.fecha_hora.desc()).all()

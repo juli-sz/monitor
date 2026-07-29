@@ -10,13 +10,16 @@ from models import Dispositivo, Paciente, PacienteDispositivo
 # Schemas (Validación)
 from schemas.dispositivo import DispositivoCreate, DispositivoUpdate, DispositivoResponse
 
+from services.auth_service import obtener_usuario_actual
+from services.permissions import requiere_rol
+
 router = APIRouter(prefix="/dispositivos", tags=["Dispositivos"])
 
 # ======================================================
 # GET: Listar todos los dispositivos y a quién están conectados
 # ======================================================
 @router.get("/", response_model=List[DispositivoResponse])
-def listar_dispositivos(db: Session = Depends(get_db)):
+def listar_dispositivos(db: Session = Depends(get_db), _=Depends(obtener_usuario_actual)):
     dispositivos = db.query(Dispositivo).all()
     resultado = []
     
@@ -47,10 +50,14 @@ def listar_dispositivos(db: Session = Depends(get_db)):
     return resultado
 
 # ======================================================
-# POST: Crear Dispositivo (y asociarlo si viene con paciente)
+# POST: Crear Dispositivo (y asociarlo si viene con paciente) (Solo Admin)
 # ======================================================
 @router.post("/", response_model=DispositivoResponse)
-def crear_dispositivo(disp_in: DispositivoCreate, db: Session = Depends(get_db)):
+def crear_dispositivo(
+    disp_in: DispositivoCreate,
+    db: Session = Depends(get_db),
+    _=Depends(requiere_rol("admin")),
+):
     nuevo_disp = Dispositivo(
         uid_equipo=disp_in.uid_equipo,
         estado=disp_in.estado
@@ -77,10 +84,15 @@ def crear_dispositivo(disp_in: DispositivoCreate, db: Session = Depends(get_db))
     }
 
 # ======================================================
-# PATCH: Actualizar Dispositivo y Vínculo con Paciente
+# PATCH: Actualizar Dispositivo y Vínculo con Paciente (Solo Admin)
 # ======================================================
 @router.patch("/{id_dispositivo}")
-def actualizar_dispositivo(id_dispositivo: int, disp_in: DispositivoUpdate, db: Session = Depends(get_db)):
+def actualizar_dispositivo(
+    id_dispositivo: int,
+    disp_in: DispositivoUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(requiere_rol("admin")),
+):
     db_disp = db.query(Dispositivo).filter(Dispositivo.id_dispositivo == id_dispositivo).first()
     if not db_disp:
         raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
@@ -124,10 +136,14 @@ def actualizar_dispositivo(id_dispositivo: int, disp_in: DispositivoUpdate, db: 
     return {"mensaje": "Equipo y conexión actualizados correctamente"}
 
 # ======================================================
-# DELETE: Eliminar Dispositivo
+# DELETE: Eliminar Dispositivo (Solo Admin)
 # ======================================================
 @router.delete("/{id_dispositivo}")
-def eliminar_dispositivo(id_dispositivo: int, db: Session = Depends(get_db)):
+def eliminar_dispositivo(
+    id_dispositivo: int,
+    db: Session = Depends(get_db),
+    _=Depends(requiere_rol("admin")),
+):
     db_disp = db.query(Dispositivo).filter(Dispositivo.id_dispositivo == id_dispositivo).first()
     if not db_disp:
         raise HTTPException(status_code=404, detail="Dispositivo no encontrado")

@@ -122,6 +122,13 @@ def on_message(client, userdata, msg):
 def iniciar_mqtt():
     """Configura y arranca el cliente MQTT en segundo plano."""
     global mqtt_client
+
+    # Si no hay broker configurado (ej: entorno de desarrollo o tests),
+    # la API arranca igual pero sin ingesta MQTT.
+    if not MQTT_BROKER:
+        print("⚠️ MQTT_BROKER no está configurado: se omite el servicio MQTT (la API funciona igual).")
+        return
+
     mqtt_client = MQTTClient(
         client_id="fastapi_api_listener",
         callback_api_version=CallbackAPIVersion.VERSION2
@@ -130,8 +137,16 @@ def iniciar_mqtt():
     mqtt_client.on_connect = on_connect
     mqtt_client.on_disconnect = on_disconnect
     mqtt_client.on_message = on_message
-    
-    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
+
+    try:
+        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
+    except Exception as e:
+        # Un broker caído no debe tirar abajo toda la API (ej: al levantar con Docker sin red al broker)
+        print(f"❌ No se pudo conectar al broker MQTT {MQTT_BROKER}:{MQTT_PORT} -> {e}")
+        print("   La API sigue funcionando sin telemetría. Reiniciá el servicio cuando el broker esté disponible.")
+        mqtt_client = None
+        return
+
     # loop_start() arranca un hilo automáticamente, no bloquea FastAPI
     mqtt_client.loop_start() 
 

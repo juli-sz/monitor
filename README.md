@@ -1,227 +1,218 @@
-# 🏥 Sistema de Monitoreo de Signos Vitales IoT
+# Sistema de Monitoreo de Signos Vitales IoT
 
-**Plataforma integral para monitoreo remoto de pacientes en tiempo real**
+Plataforma de telemetría médica para el monitoreo remoto y en tiempo real de pacientes, con ingesta de datos vía MQTT desde dispositivos ESP32, autenticación JWT y control de acceso por roles.
 
----
+## Contenido
 
-## 📋 Descripción
+- [Descripción](#descripción)
+- [Arquitectura](#arquitectura)
+- [Stack tecnológico](#stack-tecnológico)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Puesta en marcha](#puesta-en-marcha)
+- [Uso de la API](#uso-de-la-api)
+- [Roles y permisos](#roles-y-permisos)
+- [Modelo de datos](#modelo-de-datos)
+- [Testing](#testing)
+- [Documentación adicional](#documentación-adicional)
+- [Seguridad](#seguridad)
+- [Estado del proyecto](#estado-del-proyecto)
 
-Sistema de telemetría médica basado en IoT que permite monitorear signos vitales (SpO2, presión arterial, ECG, temperatura) de múltiples pacientes simultáneamente. Integra dispositivos ESP32 conectados vía MQTT, procesa datos en tiempo real, genera alertas automáticas por valores anormales, y proporciona análisis histórico. Implementa autenticación JWT con control de acceso basado en roles (admin, médico, enfermero, visor) para garantizar privacidad. Diseñado para hospitales y centros de salud con escalabilidad y confiabilidad como prioridades.
+## Descripción
 
----
+El sistema recibe telemetría (SpO2, ECG, presión arterial, temperatura) de múltiples dispositivos ESP32 vía MQTT, la procesa y persiste en PostgreSQL, evalúa un motor de alertas contra rangos configurables por paciente, y transmite eventos en tiempo real al frontend mediante WebSockets. El acceso a la API está protegido con JWT y un esquema de roles (admin, médico, enfermero, visor).
 
-## 🎯 Características Principales
+Proyecto desarrollado como parte de un plan de trabajo anual (becario junior), actualmente en la etapa de testing y contenerización.
 
-### ✅ Telemetría en Tiempo Real
-- Recepción de datos desde múltiples dispositivos ESP32 vía MQTT
-- WebSockets para transmisión de alertas instantánea
-- Procesamiento de ECG con filtros digitales (FFT, Butterworth)
-- Rango dinámico de muestreo (100-500 Hz)
+## Arquitectura
 
-### 🔐 Seguridad & Autenticación
-- JWT tokens con expiración (24h access, 7d refresh)
-- Bcrypt hashing para contraseñas
-- RBAC (4 roles con matriz de permisos)
-- Endpoints protegidos por rol
+```
+Dispositivo ESP32
+      │  MQTT (paho-mqtt)
+      ▼
+services/mqtt_service.py  ──▶  PostgreSQL (SQLAlchemy)
+      │
+      ▼
+Motor de alertas  ──▶  services/websocket_manager.py
+                              │
+                              ▼
+                        Frontend (WebSocket, tiempo real)
+```
 
-### 🚨 Sistema de Alertas
-- Motor de alertas automático (comparación contra rangos personalizados)
-- Estados: ACTIVA / RESUELTA
-- Historial completo de alertas por paciente/dispositivo
+La API expone además endpoints REST (FastAPI) para CRUD de pacientes, dispositivos, usuarios, alertas e histórico, todos detrás de autenticación JWT y validación de rol.
 
-### 📊 Análisis & Visualización
-- Histórico de lecturas con filtros temporales
-- Generación de gráficos ECG (10s, segmentado)
-- Dashboard con estado de dispositivos
-- Exportación de datos
+## Stack tecnológico
 
-### 🏗️ Arquitectura Modular
-- FastAPI (async, pydantic validation)
-- SQLAlchemy ORM + PostgreSQL
-- Servicios desacoplados (auth, MQTT, WebSockets, alertas)
-- Clean code con separación de responsabilidades
+**Backend**
 
----
-
-## 🛠️ Stack Tecnológico
-
-### Backend
-| Capa | Tecnología |
-|------|------------|
-| Framework | FastAPI 0.135.2 |
+| Componente | Tecnología |
+|---|---|
+| Framework | FastAPI 0.135 |
 | ORM | SQLAlchemy 2.0 |
-| Base de Datos | PostgreSQL 12+ |
-| Autenticación | JWT + bcrypt |
+| Base de datos | PostgreSQL 16 |
+| Autenticación | JWT (PyJWT) + bcrypt |
 | Validación | Pydantic v2 |
-| Mensajería | MQTT (paho-mqtt 2.1) |
-| Tiempo Real | WebSockets + asyncio |
-| Procesamiento | NumPy, SciPy |
-| Graficación | Matplotlib |
-| Testing | pytest, pytest-asyncio |
+| Mensajería IoT | MQTT (paho-mqtt) |
+| Tiempo real | WebSockets (asyncio) |
+| Procesamiento de señal | NumPy, SciPy |
+| Gráficos ECG | Matplotlib |
+| Testing | pytest, pytest-asyncio, pytest-cov |
 
-### Frontend
-| Componente | Tecnología |
-|-----------|------------|
-| UI | HTML5 + Bootstrap 5 |
-| Gráficas | uPlot (ECG real-time) |
-| Interactividad | JavaScript vanilla |
-| Estilos | CSS3 |
+**Frontend**
 
-### Infraestructura
-| Componente | Tecnología |
-|-----------|------------|
-| Servidor Web | Uvicorn |
-| Producción | Gunicorn + Nginx |
-| Containerización | Docker (opcional) |
-| Control de Versiones | Git |
+HTML5 + Bootstrap 5, JavaScript vanilla, uPlot para gráficos ECG en tiempo real.
 
----
+**Infraestructura**
 
-## 📦 Instalación Rápida
+Uvicorn (ASGI), Docker + Docker Compose (API + PostgreSQL), Git.
 
-### Prerequisitos
-- Python 3.9+
-- PostgreSQL 12+
-- MQTT Broker (Mosquitto)
+## Estructura del proyecto
 
-### Setup
+```
+monitor/
+├── mainf.py                    # Punto de entrada FastAPI
+├── models.py                   # Modelos SQLAlchemy (10 entidades)
+├── config.py                   # Configuración / variables de entorno
+├── database.py                 # Engine y sesión de PostgreSQL
+│
+├── routes/                     # Endpoints REST
+│   ├── auth.py                 # Login, registro, refresh, logout
+│   ├── pacientes.py            # CRUD de pacientes
+│   ├── dispositivos.py         # CRUD de dispositivos
+│   ├── usuarios.py             # Gestión de usuarios (solo admin)
+│   ├── alertas.py               # Alertas y resolución
+│   ├── sensores.py             # Rangos de signos vitales
+│   ├── historico.py            # Consultas históricas y ECG
+│   └── websockets.py           # Conexiones WebSocket
+│
+├── services/                   # Lógica de negocio
+│   ├── auth_service.py         # JWT, hashing de contraseñas
+│   ├── permissions.py          # Dependencia de control de acceso por rol
+│   ├── mqtt_service.py         # Cliente MQTT / ingesta de telemetría
+│   ├── websocket_manager.py    # Gestión de conexiones WebSocket
+│   └── signal_processor.py     # Filtros y procesamiento de ECG
+│
+├── schemas/                     # Esquemas Pydantic
+├── admin/                       # Frontend (dashboard, gestión, monitor)
+├── docs/                        # Diagramas de entidad-relación y de flujo
+├── pruebas_sensores/            # Simuladores de dispositivos IoT (MQTT)
+├── tests/                       # Suite de tests (pytest)
+├── db/init/                     # Scripts de inicialización de BD (Docker)
+│
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt              # Dependencias de producción
+├── requirements-dev.txt          # Dependencias de testing
+└── .env.example                  # Plantilla de variables de entorno
+```
+
+## Puesta en marcha
+
+Dos caminos: **Docker** (base de datos incluida, cero instalación local) o **entorno local** (requiere PostgreSQL instalado). Los pasos de configuración de `.env` y de MQTT son los mismos en ambos casos.
+
+### 1. Clonar el repo y configurar variables de entorno
+
 ```bash
-# Clonar proyecto
-git clone <repo> && cd monitor-vitales
+git clone <url-del-repo> monitor
+cd monitor
+cp .env.example .env
+```
 
-# Entorno virtual
+Editá `.env`:
+
+```bash
+# Generá una clave propia para firmar los JWT (no usar la de ejemplo)
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Pegá el resultado en `SECRET_KEY`. El resto de las variables (`DATABASE_URL`, `MQTT_*`) se explican en los pasos siguientes.
+
+### 2. Base de datos
+
+**Con Docker:** no requiere ningún paso manual. `docker-compose.yml` levanta un contenedor PostgreSQL 16 con las bases `monitor` (datos de la app) y `monitor_test` (para pytest), usando las credenciales que definas en `.env`. Al arrancar la API, `mainf.py` ejecuta `Base.metadata.create_all(bind=engine)`, que crea automáticamente todas las tablas si no existen — no hay que correr migraciones a mano.
+
+**Sin Docker (PostgreSQL local):**
+
+1. Instalá PostgreSQL 16 y asegurate de que el servicio esté corriendo.
+2. Creá la base y el usuario de la app:
+   ```bash
+   psql -U postgres -c "CREATE USER monitor WITH PASSWORD 'monitor';"
+   psql -U postgres -c "CREATE DATABASE monitor OWNER monitor;"
+   ```
+3. (Opcional, solo si vas a correr los tests) creá también la base de test:
+   ```bash
+   psql -U postgres -c "CREATE DATABASE monitor_test OWNER monitor;"
+   ```
+4. En `.env`, apuntá `DATABASE_URL` a esa base:
+   ```
+   DATABASE_URL=postgresql://monitor:monitor@localhost:5432/monitor
+   ```
+5. Las tablas se crean solas la primera vez que arranca la API (paso 4 de esta guía) — no hace falta ejecutar ningún script de creación de esquema.
+
+### 3. Conexión MQTT
+
+La API solo **suscribe** telemetría; no necesita un broker propio para arrancar. Si `MQTT_BROKER` queda vacío en `.env`, el servidor levanta igual sin ingesta de datos (útil para trabajar solo sobre los endpoints REST).
+
+**Opción A — Usar un broker existente**
+
+Completá en `.env`:
+
+```
+MQTT_BROKER=<host-del-broker>
+MQTT_PORT=1883
+MQTT_USERNAME=<usuario>
+MQTT_PASSWORD=<contraseña>
+MQTT_TOPIC=datos/sensores/#
+```
+
+`services/mqtt_service.py` se conecta a ese broker al iniciar la API y se suscribe a `MQTT_TOPIC`. El tipo de sensor se infiere del último segmento del topic (`datos/sensores/ecg`, `datos/sensores/spo2`, `datos/sensores/bpm`, `datos/sensores/pni`, `datos/sensores/temperatura_piel`, etc.), así que cualquier publicador que respete ese formato de topic y payload JSON es compatible.
+
+**Opción B — Broker local para desarrollo/pruebas (recomendado si no tenés uno)**
+
+1. Instalá y arrancá Mosquitto (o cualquier broker MQTT) en tu máquina, escuchando en `localhost:1883`.
+2. En `.env`:
+   ```
+   MQTT_BROKER=localhost
+   MQTT_PORT=1883
+   MQTT_USERNAME=
+   MQTT_PASSWORD=
+   MQTT_TOPIC=datos/sensores/#
+   ```
+3. Simulá dispositivos ESP32 con los scripts de `pruebas_sensores/` (`p1.py` … `p13.py`), que publican payloads de ejemplo (ECG, SpO2, PNI, temperatura, etc.) en `datos/sensores/<tipo>`:
+   ```bash
+   pip install paho-mqtt
+   python pruebas_sensores/p1.py
+   ```
+   Antes de correrlo, revisá el `BROKER`/`USUARIO`/`CONTRASENA` hardcodeados al inicio del script y ajustalos a tu broker local.
+4. Con la API corriendo, deberías ver en sus logs `MQTT conectado exitosamente` y, al publicar, los datos llegando a la base y propagándose por WebSocket al frontend en tiempo real.
+
+### 4. Levantar el servidor
+
+**Con Docker:**
+
+```bash
+docker compose up --build -d
+docker compose logs -f api      # verificar arranque y conexión MQTT
+```
+
+Guía extendida (troubleshooting, comandos del día a día) en [DOCKER.md](./DOCKER.md).
+
+**Local:**
+
+```bash
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate        # Windows: venv\Scripts\activate
 
-# Instalar dependencias
 pip install -r requirements.txt
-
-# Configurar .env
-echo "DATABASE_URL=postgresql://user:pass@localhost/monitor_vitales" > .env
-echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')" >> .env
-
-# Sincronizar BD
-python -c "from models import Base; from database import engine; Base.metadata.create_all(bind=engine)"
-
-# Ejecutar servidor
 uvicorn mainf:app --reload --port 8000
 ```
 
-**Swagger UI**: http://localhost:8000/docs
+### 5. Verificar la instalación
 
----
+- `http://localhost:8000/` → `{"message": "API funcionando correctamente"}`
+- `http://localhost:8000/docs` → Swagger UI con todos los endpoints
+- Frontend: abrí `login.html` en el navegador (ya apunta a `http://localhost:8000`)
 
-## 📚 Documentación
-
-| Documento | Contenido |
-|-----------|-----------|
-| [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) | Guía completa de deploy local y producción |
-| [MANUAL_USUARIO.md](./MANUAL_USUARIO.md) | Funcionalidades por rol, flujos de uso |
-| [TESTING_AUTENTICACION.md](./TESTING_AUTENTICACION.md) | JWT, validación de tokens, testing |
-| [TESTING_RBAC.md](./TESTING_RBAC.md) | Matriz de permisos, escenarios RBAC |
-| [TESTING_REFRESH_TOKEN.md](./TESTING_REFRESH_TOKEN.md) | Refresh token, renovación de sesión |
-| [GUIA_MIGRACION.md](./GUIA_MIGRACION.md) | Migración desde versión anterior |
-
----
-
-## 🗂️ Estructura del Proyecto
-
-```
-monitor-vitales/
-├── mainf.py                 # Punto de entrada FastAPI
-├── models.py                # Modelos SQLAlchemy (10 entidades)
-├── config.py                # Configuración
-├── database.py              # Session, engine PostgreSQL
-│
-├── routes/                  # Endpoints (21 protegidos)
-│   ├── auth.py             # Login, registro, refresh, logout
-│   ├── pacientes.py        # CRUD pacientes + RBAC
-│   ├── dispositivos.py     # CRUD dispositivos + RBAC
-│   ├── usuarios.py         # Gestión usuarios (admin only)
-│   ├── alertas.py          # Alertas, resolución
-│   ├── sensores.py         # Rangos vitales
-│   ├── historico.py        # Consultas históricas, ECG
-│   └── websockets.py       # Conexiones WS
-│
-├── services/               # Lógica de negocio
-│   ├── auth_service.py    # JWT, bcrypt, hashing
-│   ├── permissions.py     # RBAC matrix, validación roles
-│   ├── mqtt_service.py    # Cliente MQTT, callback
-│   ├── websocket_manager.py # Gestión conexiones WS
-│   └── signal_processor.py # Filtros ECG, procesamiento
-│
-├── schemas/                # Validación Pydantic
-│   ├── usuario.py
-│   ├── paciente.py
-│   ├── dispositivo.py
-│   ├── alerta.py
-│   └── sensores.py
-│
-├── admin/                  # Frontend
-│   ├── index.html         # Dashboard principal
-│   ├── pacientes.html     # Gestión pacientes
-│   ├── usuarios.html      # Gestión usuarios
-│   ├── equipos.html       # Dispositivos
-│   ├── alarmas.html       # Alertas
-│   ├── monitorU1.html     # Monitor individual
-│   └── panel.html         # Panel de control
-│
-├── docs/                   # Documentación técnica
-│   ├── estructura.md      # Diagrama entidades
-│   ├── MER_telemetria.html # Entity-Relationship
-│   └── *.svg              # Diagramas flujo
-│
-├── pruebas_sensores/      # Simuladores IoT
-│   ├── p1.py - p13.py     # Scripts que generan datos MQTT
-│
-├── requirements.txt        # Dependencias Python
-├── .env                    # Variables de entorno (no commitear)
-└── README.md              # Este archivo
-
-```
-
----
-
-## 🔑 Entidades Principales
-
-| Entidad | Descripción | Relaciones |
-|---------|------------|-----------|
-| **Usuario** | Credenciales + rol de acceso | Auth |
-| **Paciente** | Datos demográficos, diagnóstico | Dispositivos, Alertas |
-| **Dispositivo** | ESP32 identificado por UID | Sensores, Lecturas |
-| **Sensor** | Tipo (SpO2, Temp, ECG, etc) | Dispositivo |
-| **LecturaGeneral** | Valor + timestamp | Paciente, Dispositivo |
-| **ECG** | Bloque de muestras + frecuencia | Paciente, Dispositivo |
-| **LecturaPNI** | Presión sistólica/diastólica | Paciente, Dispositivo |
-| **RangoSignoVital** | Umbrales normales personalizados | Paciente (opcional) |
-| **Alerta** | Evento por valor fuera de rango | Paciente, Dispositivo |
-| **PacienteDispositivo** | Histórico de asociaciones | Paciente, Dispositivo |
-
----
-
-## 👥 Roles y Permisos
-
-### Admin
-✅ CRUD total (usuarios, pacientes, dispositivos, alertas)
-
-### Médico
-✅ CRUD pacientes  
-✅ Leer dispositivos  
-✅ Crear/resolver alertas  
-✅ Ver histórico completo
-
-### Enfermero
-✅ Leer pacientes y dispositivos  
-✅ Resolver alertas  
-✅ Ver histórico
-
-### Visor
-✅ Lectura solo: pacientes, alertas, histórico  
-❌ Sin permisos de escritura
-
----
-
-## 🚀 Inicio Rápido
+## Uso de la API
 
 ```bash
 # 1. Registrar usuario
@@ -229,98 +220,72 @@ curl -X POST http://localhost:8000/auth/registro \
   -H "Content-Type: application/json" \
   -d '{"nombre":"Admin","email":"admin@test.com","password":"123456","rol":"admin"}'
 
-# 2. Login (obtener tokens)
+# 2. Login
 curl -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@test.com","password":"123456"}'
+# → { "access_token": "...", "refresh_token": "...", "token_type": "bearer", "rol": "admin" }
 
-# Respuesta:
-{
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ...",
-  "token_type": "bearer",
-  "rol": "admin",
-  "nombre": "Admin"
-}
-
-# 3. Usar token
+# 3. Consumir un endpoint protegido
 curl -X GET http://localhost:8000/pacientes/ \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
-
-# 4. Swagger UI
-# Abrir: http://localhost:8000/docs
-# Botón "Authorize" → pegar token → testear endpoints
 ```
 
----
+## Roles y permisos
 
-## 📊 Flujo de Datos
+Cada endpoint declara los roles habilitados mediante la dependencia `requiere_rol(...)` (`services/permissions.py`).
 
+| Rol | Alcance |
+|---|---|
+| **Admin** | Acceso total: usuarios, pacientes, dispositivos, alertas |
+| **Médico** | CRUD de pacientes, lectura de dispositivos, gestión de alertas, histórico completo |
+| **Enfermero** | Lectura de pacientes/dispositivos, resolución de alertas, histórico |
+| **Visor** | Solo lectura: pacientes, alertas, histórico |
+
+## Modelo de datos
+
+10 entidades principales (`models.py`): `Usuario`, `Paciente`, `Dispositivo`, `Sensor`, `LecturaGeneral`, `ECG`, `LecturaPNI`, `RangoSignoVital`, `Alerta`, `PacienteDispositivo`. Diagrama entidad-relación en [`docs/MER_telemetria.html`](./docs/MER_telemetria.html) y descripción en [`docs/estructura.md`](./docs/estructura.md).
+
+## Testing
+
+Suite de 91 tests con ~97% de cobertura, corridos contra una base PostgreSQL de test dedicada (nunca contra los datos reales).
+
+```bash
+# Con Docker
+docker compose exec api pytest --cov=. --cov-report=term-missing
+
+# Local
+pip install -r requirements.txt -r requirements-dev.txt
+pytest --cov=. --cov-report=term-missing
 ```
-Dispositivo ESP32
-    ↓ (MQTT)
-Broker (161.35.100.210:1884)
-    ↓
-mainf.py (on_message)
-    ↓
-Procesar → Base de datos
-    ↓
-Motor de alertas
-    ↓
-WebSocket → Frontend (tiempo real)
-    ↓
-Dashboard actualizado
-```
 
----
+Detalle de qué cubre cada archivo de test en [`tests/README.md`](./tests/README.md).
 
-## 🔐 Seguridad Implementada
+## Documentación adicional
 
-✅ JWT con expiración  
-✅ Bcrypt hashing  
-✅ RBAC con matriz de permisos  
-✅ Validación Pydantic en todos los inputs  
-✅ Protección CORS  
-✅ Variables de entorno (no hardcodear secretos)  
-✅ Endpoints solo accesibles con token válido  
+| Documento | Contenido |
+|---|---|
+| [DOCKER.md](./DOCKER.md) | Guía completa de contenerización (setup, troubleshooting, comandos) |
+| [tests/README.md](./tests/README.md) | Estructura y alcance de la suite de tests |
+| [docs/estructura.md](./docs/estructura.md) | Descripción del modelo de entidades |
+| [docs/MER_telemetria.html](./docs/MER_telemetria.html) | Diagrama entidad-relación |
 
----
+## Seguridad
 
-## 📈 Métricas de Calidad
+- JWT con expiración (access / refresh token) y hashing de contraseñas con bcrypt
+- Control de acceso por rol en cada endpoint protegido
+- Validación de entrada con Pydantic en todos los inputs
+- Variables sensibles fuera del código, vía `.env` (excluido de git)
 
-- **Endpoints**: 21 protegidos con autenticación
-- **Roles**: 4 (admin, médico, enfermero, visor)
-- **Permisos**: 41 granulares
-- **Entidades**: 10 modelos SQLAlchemy
-- **Testing**: pytest (T3: ≥70% cobertura)
+> `.env` nunca debe commitearse. Usá `.env.example` como plantilla y generá un `SECRET_KEY` propio con `python -c "import secrets; print(secrets.token_hex(32))"`.
 
----
+## Estado del proyecto
 
-## 🤝 Contribuciones
+En desarrollo activo — etapa de testing, alertas automáticas y contenerización.
 
-Basado en plan de trabajo anual para becario junior:
-- **T1 (Sem 1-13)**: Fundamentos y CRUD ✅
-- **T2 (Sem 14-26)**: Autenticación y RBAC ✅
-- **T3 (Sem 27-39)**: Testing y alertas automáticas 🔄
-- **T4 (Sem 40-52)**: Documentación y deploy 📋
+- Fundamentos y CRUD — completo
+- Autenticación y RBAC — completo
+- Testing y alertas automáticas — en curso
+- Documentación y deploy — pendiente
 
----
-
-## 📞 Soporte y Documentación
-
-- **Issues**: Crear issue en repositorio
-- **Docs**: Ver carpeta `/docs`
-- **API**: Swagger en `/docs` (desarrollo) o `/redoc`
-
----
-
-## 📄 Licencia
-
-Proyecto académico - Instituto Universitario
-
----
-
-**Última actualización**: Junio 2026  
-**Versión**: 2.0.0 (T2 Completo)  
-**Status**: ✅ En desarrollo activo
-
+**Licencia**: proyecto académico.

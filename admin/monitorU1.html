@@ -545,7 +545,13 @@
        * - para ECG: payload.raw_values (array) y payload.FS (opcional)
        * - para SPO2: payload.SPO2_IR (array) o payload.value
        ****************************************************************/
-      const WS_URL = "ws://localhost:8000/ws/datos";
+      const token = localStorage.getItem("token");
+      if (!token) window.location.replace("../login.html");
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const uidObjetivo = urlParams.get("uid");
+
+      const WS_URL = `ws://localhost:8000/ws/datos?token=${token}`;
       const ws = new WebSocket(WS_URL);
 
       ws.onopen = () => {
@@ -560,6 +566,9 @@
           const msg = JSON.parse(evt.data);
           const sensor = msg.sensor;
           const payload = msg.payload || msg;
+
+          // Ignorar mensajes de otros equipos: solo nos interesa el que abrimos por ?uid=
+          if (uidObjetivo && payload.Uid_Equipo && payload.Uid_Equipo !== uidObjetivo) return;
 
           // ECG
           if (sensor === "ecg" || payload.raw_values) {
@@ -634,7 +643,7 @@
        ****************************************************************/
       document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("backButton").onclick = () =>
-          (location.href = "index.html");
+          (location.href = "panel.html");
         // initRealtime(FS_DEFAULT); // opcional: ya se llama al abrir WS
       });
     </script>

@@ -165,12 +165,13 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    const CONFIG = {
-      API_BASE: "http://localhost:8000",
-      WS_URL: "ws://localhost:8000/ws/datos"
-    };
     const token = localStorage.getItem("token");
     if (!token) window.location.replace("../login.html");
+
+    const CONFIG = {
+      API_BASE: "http://localhost:8000",
+      WS_URL: `ws://localhost:8000/ws/datos?token=${token}`
+    };
 
     // Variables globales para guardar la info del paciente
     let pacienteData = null;

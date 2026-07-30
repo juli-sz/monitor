@@ -38,6 +38,12 @@ jobs:
           mkdir -p site/admin
           cp login.html app.js styles.css site/
           cp admin/*.html site/admin/
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=login.html">
+          <p><a href="login.html">Continuar a login.html</a></p>
+          HTML
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

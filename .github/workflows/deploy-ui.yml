@@ -1,0 +1,59 @@
+name: Deploy UI to GitHub Pages
+
+# Publishes the static frontend (login.html, app.js, styles.css, admin/*.html) to
+# GitHub Pages. These files talk to the API at http://localhost:8000 (see app.js /
+# login.html CONFIG), so the deployed page only shows data when the *visitor's own*
+# machine has the project's docker compose stack running locally — nothing is proxied
+# to a shared backend.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "login.html"
+      - "app.js"
+      - "styles.css"
+      - "admin/**"
+      - ".github/workflows/deploy-ui.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assemble static site
+        run: |
+          mkdir -p site/admin
+          cp login.html app.js styles.css site/
+          cp admin/*.html site/admin/
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -2,8 +2,6 @@
 # IMPORTS
 # ======================================================
 from contextlib import asynccontextmanager
-import datetime
-from typing import Optional
 import asyncio
 from routes.alertas import router as alertas_router
 from routes.dispositivos import router as dispositivos_router
@@ -11,15 +9,14 @@ from routes.sensores import router as sensores_router
 from routes.usuarios import router as usuarios_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException, Depends
-from paho.mqtt.client import Client as MQTTClient, CallbackAPIVersion
 from fastapi import FastAPI
 from sqlalchemy.orm import Session
 
 import models
-from models import Dispositivo, Paciente, PacienteDispositivo, ECG, LecturaPNI, LecturaGeneral
-from services.signal_processor import ecg_filter_realtime
+from models import Dispositivo, Paciente, PacienteDispositivo
 from services.auth_service import obtener_usuario_actual
-from database import Base, engine, get_db
+from config import CORS_ORIGINS
+from database import engine, get_db
 
 # Importamos nuestras rutas y el manager
 from routes.websockets import router as ws_router
@@ -36,7 +33,7 @@ models.Base.metadata.create_all(bind=engine)
 async def lifespan(app: FastAPI):
     
     print("Sincronizando Base de Datos...")
-    Base.metadata.create_all(bind=engine)
+    models.Base.metadata.create_all(bind=engine)
     
     # Cuando arranca el servidor, capturamos el bucle asíncrono principal para WebSockets
     ws_manager.main_loop = asyncio.get_running_loop()
@@ -57,7 +54,7 @@ app = FastAPI(title="API de Monitoreo de Signos Vitales", lifespan=lifespan)
 # ======================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,  # configurable por .env (ver config.py)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,5 +1,4 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from config import DB_URL
 
@@ -15,10 +14,11 @@ engine = create_engine(DB_URL)
 # Configuramos el pool de sesiones
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base para nuestros modelos
-Base = declarative_base()
+# OJO: el `Base` de los modelos vive en models.py y es el único del proyecto.
+# Acá había un segundo declarative_base() que no usaba nadie: mainf.py llamaba
+# create_all() sobre él y no creaba ninguna tabla (silenciosamente).
 
-# Dependencia para FastAPI: Cada vez que un endpoint necesite la BD, 
+# Dependencia para FastAPI: Cada vez que un endpoint necesite la BD,
 # abrirá una sesión y la cerrará al terminar, devolviéndola al pool.
 def get_db():
     db = SessionLocal()

@@ -58,6 +58,15 @@ def crear_dispositivo(
     db: Session = Depends(get_db),
     _=Depends(requiere_rol("admin")),
 ):
+    # El uid_equipo es UNIQUE en la base: sin este chequeo, un UID repetido
+    # explotaba como IntegrityError y el cliente recibía un 500.
+    ya_existe = db.query(Dispositivo).filter(Dispositivo.uid_equipo == disp_in.uid_equipo).first()
+    if ya_existe:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ya existe un dispositivo con el UID '{disp_in.uid_equipo}'",
+        )
+
     nuevo_disp = Dispositivo(
         uid_equipo=disp_in.uid_equipo,
         estado=disp_in.estado

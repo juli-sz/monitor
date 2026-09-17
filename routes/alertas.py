@@ -22,7 +22,9 @@ def registrar_alerta(
 ):
     disp = db.query(Dispositivo).filter(Dispositivo.uid_equipo == alerta_in.uid_equipo).first()
     if not disp:
-        return {"error": "Equipo no encontrado"}
+        # Antes devolvía {"error": ...} con status 200: cualquier cliente que
+        # mirara resp.ok creía que la alerta se había registrado.
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
 
     # Buscamos si alguien está conectado a ese equipo AHORA MISMO
     asoc_activa = db.query(PacienteDispositivo).filter(

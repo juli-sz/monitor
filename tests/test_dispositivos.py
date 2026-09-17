@@ -27,6 +27,18 @@ def test_crear_dispositivo_sin_uid_devuelve_422(client, admin_headers):
     assert resp.status_code == 422
 
 
+def test_crear_dispositivo_uid_duplicado_devuelve_400(client, crear_dispositivo, db, admin_headers):
+    """uid_equipo es UNIQUE: repetirlo da 400, no un 500 por IntegrityError."""
+    crear_dispositivo(uid_equipo="ESP32-REPETIDO")
+
+    resp = client.post("/dispositivos/", headers=admin_headers, json={"uid_equipo": "ESP32-REPETIDO"})
+
+    assert resp.status_code == 400
+    assert "ESP32-REPETIDO" in resp.json()["detail"]
+    # Sigue habiendo uno solo
+    assert db.query(models.Dispositivo).filter_by(uid_equipo="ESP32-REPETIDO").count() == 1
+
+
 def test_crear_dispositivo_con_paciente_crea_asociacion(client, crear_paciente, db, admin_headers):
     paciente = crear_paciente()
     resp = client.post(

@@ -10,12 +10,15 @@ import models
 # ALERTAS
 # ======================================================
 
-def test_registrar_alerta_equipo_inexistente(client, medico_headers):
+def test_registrar_alerta_equipo_inexistente(client, medico_headers, db):
+    """Un equipo que no existe da 404, no un 200 con {"error": ...} adentro."""
     resp = client.post("/alertas/", headers=medico_headers, json={
         "uid_equipo": "NO-EXISTE", "sensor": "spo2", "valor": "82",
     })
-    assert resp.status_code == 200
-    assert resp.json() == {"error": "Equipo no encontrado"}
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Equipo no encontrado"
+    # Y no quedó ninguna alerta huérfana en la base
+    assert db.query(models.Alerta).count() == 0
 
 
 def test_registrar_alerta_enfermero_403(client, crear_dispositivo, enfermero_headers):

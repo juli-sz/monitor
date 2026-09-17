@@ -1,17 +1,16 @@
 import bcrypt
 import jwt
 import datetime
-import os
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+from config import SECRET_KEY
 from database import get_db
 from models import Usuario
 
-# Clave secreta para firmar los tokens
-SECRET_KEY = os.getenv("SECRET_KEY", "super_secreto_desarrollo")
+# La clave sale de config.py, que aborta el arranque si no está definida.
 ALGORITHM = "HS256"
 
 # tokenUrl es solo informativo para el botón "Authorize" de Swagger;

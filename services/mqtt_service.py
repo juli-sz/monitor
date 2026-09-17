@@ -76,13 +76,19 @@ def on_message(client, userdata, msg):
                     fs = payload.get("FS", 360)
                     filtered = ecg_filter_realtime(raw_values, fs, uid_equipo)
                     payload["raw_values"] = filtered.tolist()
-                except:
+                except (ValueError, TypeError) as e:
+                    # Si el filtro falla, emitimos la señal cruda igual: es preferible
+                    # ver el ECG sin filtrar a no verlo. El bloque ya se guardó.
+                    print(f"[MQTT] No se pudo filtrar el ECG de {uid_equipo}: {e}")
                     payload["raw_values"] = raw_values
 
         elif sensor_tipo == "pni":
             try:
                 sist, diast = map(int, payload.get("value", "0/0").split("/"))
-            except:
+            except (ValueError, TypeError, AttributeError) as e:
+                # Formato esperado "120/80". Si viene roto, descartamos la lectura
+                # y seguimos: no vale la pena cortar la ingesta por un mensaje malo.
+                print(f"[MQTT] PNI con formato inválido de {uid_equipo}: {payload.get('value')!r} ({e})")
                 return
             nuevo = LecturaPNI(
                 id_dispositivo=id_dispositivo,
